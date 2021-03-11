@@ -1,0 +1,13 @@
+{
+    "name": "ley",
+    "version": "1.0.0",
+    "description": "Frontend JavaScript web framework based on JSX syntax",
+    "keywords": [
+        "ley"
+    ],
+    "homepage": "https://github.com/reves/ley",
+    "bugs": "https://github.com/reves/ley/issues",
+    "license": "MIT",
+    "browser": "./ley.js",
+    "repository": "github:reves/ley"
+}
