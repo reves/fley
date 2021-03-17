@@ -8,7 +8,6 @@ function jsx(type, props, key) {
         return new Component(type, props)
     }
 
-    // Element
     return new Element(type, props, key)
 }
 

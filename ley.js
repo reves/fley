@@ -13,7 +13,7 @@ export default function ley(rootElementId, container) {
     rootElement.appendChild(rootContainer.node)
 
     // console.timeEnd('RENDER') // DEBUG
-    window.ley = rootContainer.component; // DEBUG
+    // window.ley = rootContainer.component; // DEBUG
     // console.log('Container:', window.ley) // DEBUG
 
 }
