@@ -1,3 +1,9 @@
+let prefix = ''
+
+function setPrefix(newPrefix = '') {
+    prefix = newPrefix
+}
+
 function get(endpoint, params) {
 
     let encodedParams = '?'
@@ -8,7 +14,7 @@ function get(endpoint, params) {
     }
 
     const xhr = new XMLHttpRequest()
-    xhr.open('GET', endpoint + encodedParams, true)
+    xhr.open('GET', prefix + endpoint + encodedParams, true)
     xhr.responseType = 'json'
     xhr.timeout = 5000
     xhr.send()
@@ -26,7 +32,7 @@ function post(endpoint, fields) {
     }
 
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', endpoint, true)
+    xhr.open('POST', prefix + endpoint, true)
     xhr.responseType = 'json'
     xhr.timeout = 5000
     xhr.setRequestHeader('X-CSRF-Token', document.cookie.replace(new RegExp('(?:(?:^|.*;\\s*)' + 'csrftoken' + '\\s*\\=\\s*([^;]*).*$)|^.*$'), '$1'))
@@ -75,6 +81,7 @@ function EventSetter(xhr) {
 }
 
 export default {
+    setPrefix,
     get,
     post
 }
