@@ -1,3 +1,5 @@
+import { getCookie } from './utils'
+
 let prefix = ''
 
 function setPrefix(newPrefix = '') {
@@ -35,7 +37,7 @@ function post(endpoint, fields) {
     xhr.open('POST', prefix + endpoint, true)
     xhr.responseType = 'json'
     xhr.timeout = 5000
-    xhr.setRequestHeader('X-CSRF-Token', document.cookie.replace(new RegExp('(?:(?:^|.*;\\s*)' + 'csrftoken' + '\\s*\\=\\s*([^;]*).*$)|^.*$'), '$1'))
+    xhr.setRequestHeader('X-CSRF-Token', getCookie('csrftoken'))
     xhr.send(data)
 
     return new EventSetter(xhr)

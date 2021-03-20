@@ -8,6 +8,6 @@
     "homepage": "https://github.com/reves/ley",
     "bugs": "https://github.com/reves/ley/issues",
     "license": "MIT",
-    "browser": "./ley.js",
+    "browser": "./index.js",
     "repository": "github:reves/ley"
 }
