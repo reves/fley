@@ -1,10 +1,5 @@
+import { is } from './utils'
 import update from './container/update'
-
-function is(x, y) {
-    return (
-        (x === y && (x !== 0 || 1 / x === 1 / y)) || (x !== x && y !== y)
-    )
-}
 
 export default function State(state = {}) {
 
