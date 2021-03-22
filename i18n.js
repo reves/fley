@@ -128,42 +128,29 @@ i18n.t = (key, sub = null) => {
         return ''
     }
 
-    // Resolve "includes"
-    value = value.replace(
+    value = value.replace( // includes
         /\@\{([^\}]*)\}/g,
         (_, $1) => $1.charAt(0) === '.' ? i18n.t(parentKey + $1) : i18n.t($1)
     )
 
-    if (sub == null) return value
-    if (typeof sub === 'string') return value.replace(/\{s\}/g, sub)
-    if (typeof sub === 'number') return value.replace(
-        /\{n\}(?:(\s*)\(([^\)]*\|[^\)]*)\))?|\(([^\)]*\|[^\)]*)\)/g,
-        (_, $1, $2, $3) => $3 ? $3.replace(/\{n\}/g, sub).split('|', 10)[rule(Math.abs(sub))].trim() : sub + ($1 || '') + ($2 ? $2.split('|', 10)[rule(Math.abs(sub))].trim() : '')
+    return interpolate(value, sub)
+}
+
+function interpolate(tpl, sub, tag) {
+    if (sub == null) return tpl
+    if (typeof sub === 'string') return tpl.replace(new RegExp('/\\{' + (tag || 's') + '\\}', 'g'), sub)
+    if (typeof sub === 'number') return tpl.replace(
+        new RegExp('\\{' + (tag || 'n') + '\\}(?:(\\s*)\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'),
+        (_, $1, $2, $3) => $3 ? $3.replace(new RegExp('\\{' + (tag || 'n') + '\\}', 'g'), sub).split('|', 10)[rule(Math.abs(sub))].trim() : sub + ($1 || '') + ($2 ? $2.split('|', 10)[rule(Math.abs(sub))].trim() : '')
     )
-
-    if (sub instanceof Array) { /////////////// redo
-        sub.forEach((v,i) => {
-            if (v == null) return value = value.replace(new RegExp('\{' + i + '\}', 'g'), '')
-            if (typeof v === 'string') return value = value.replace(new RegExp('\{' + i + '\}', 'g'), v)
-            if (typeof v === 'number') return value = value.replace(
-                new RegExp('\\{' + i + '\\}(?:(\\s*)\\(([^\\)]*\\|[^\\)]*)\\))?', 'g'),
-                (_, $1, $2) => v + ($1 || '') + ($2 ? $2.split('|', 10)[rule(Math.abs(v))].trim() : '')
-            )
-        })
-
-        return value
-    } ///////////////////
-
-    for (const k in sub) { //////////////// redo
-        if (sub[k] == null) {value = value.replace(new RegExp('\{' + k + '\}', 'g'), ''); continue}
-        if (typeof sub[k] === 'string') {value = value.replace(new RegExp('\{' + k + '\}', 'g'), sub[k]); continue}
-        if (typeof sub[k]=== 'number') {value = value.replace(
-            new RegExp('\\{' + k + '\\}(?:(\\s*)\\(([^\\)]*\\|[^\\)]*)\\))?', 'g'),
-            (_, $1, $2) => sub[k] + ($1 || '') + ($2 ? $2.split('|', 10)[rule(Math.abs(sub[k]))].trim() : '')
-        ); continue}
-    } ///////////////////
-
-    return value
+    if (typeof sub === 'boolean') return sub ? tpl : ''
+    if (typeof sub !== 'object') return tpl
+    if (sub instanceof Array) {
+        sub.forEach((s, i) => tpl = interpolate(tpl, s, i))
+        return tpl
+    }
+    for (const k in sub) value = interpolate(value, sub[k], k)
+    return tpl
 }
 
 function getRule(code) {
