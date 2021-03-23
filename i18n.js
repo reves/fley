@@ -52,8 +52,6 @@ const pluralRules = [
 
 // Refactor spaghetti code
 
-// Data models iterpolation e.g. https://www.i18next.com/translation-function/interpolation#working-with-data-models
-
 // Date
 // Currency
 
@@ -138,18 +136,18 @@ i18n.t = (key, sub = null) => {
 
 function interpolate(tpl, sub, tag) {
     if (sub == null) return tpl
-    if (typeof sub === 'string') return tpl.replace(new RegExp('/\\{' + (tag || 's') + '\\}', 'g'), sub)
     if (typeof sub === 'number') return tpl.replace(
         new RegExp('\\{' + (tag || 'n') + '\\}(?:(\\s*)\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'),
         (_, $1, $2, $3) => $3 ? $3.replace(new RegExp('\\{' + (tag || 'n') + '\\}', 'g'), sub).split('|', 10)[rule(Math.abs(sub))].trim() : sub + ($1 || '') + ($2 ? $2.split('|', 10)[rule(Math.abs(sub))].trim() : '')
     )
+    if (typeof sub === 'string') return tpl.replace(new RegExp('\\{' + (tag || 's') + '\\}', 'g'), sub)
     if (typeof sub === 'boolean') return sub ? tpl : ''
     if (typeof sub !== 'object') return tpl
     if (sub instanceof Array) {
         sub.forEach((s, i) => tpl = interpolate(tpl, s, i))
         return tpl
     }
-    for (const k in sub) value = interpolate(value, sub[k], k)
+    for (const k in sub) tpl = interpolate(tpl, sub[k], (tag ? tag + '.' + k : k))
     return tpl
 }
 
@@ -161,8 +159,8 @@ function getRule(code) {
     }
 }
 
-function getValue(key, locale) {
-    return key ? key.split('.').reduce((o, i) => o[i], locale) : null
+function getValue(key, object) {
+    return key ? key.split('.').reduce((o, i) => o[i], object) : null
 }
 
 export default i18n
