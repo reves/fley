@@ -49,16 +49,13 @@ const pluralRules = [
 
 
 // TODO:
+// Number formatting
+// DateTime since: e.g. n minutes ago
+// Separating DateTime or Number value for styling
 
 // Refactor spaghetti code
-
-// Date
-// Currency
-
 // Treat not found key error
-
 // Move pluralization rule to the locale file?
-
 // Use something like <lang key=”greeting”/> buit-in ley component, that listens to language state.
 // Lazy loading
 
@@ -66,8 +63,10 @@ const pluralRules = [
 let locales = {}
 let fallback = null
 let locale = null
-let rule = null
 let code = ''
+let rule = null
+let dateTimeFormat = {} // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat#parameters
+let numberFormat = {} // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat#parameters
 
 const [i18n, setState] = State({})
 
@@ -94,11 +93,16 @@ i18n.define = (newLocales) => {
     i18n.set(code = fallbackCode)
 }
 
-i18n.set = (code) => {
-    if (!locales.hasOwnProperty(code)) return false
+i18n.set = (newCode) => {
+    if (!locales.hasOwnProperty(newCode)) return false
+    code = newCode
     document.cookie = 'lang=' + code + ';path=/;max-age=31536000;secure;samesite=Lax'
     locale = locales[code]
     rule = getRule(code) || pluralRules[0][1]
+    if (locale._dateTime) for (const key in locale._dateTime) { dateTimeFormat = locale._dateTime[key]; break }
+    else dateTimeFormat = {}
+    if (locale._number) for (const key in locale._number) { numberFormat = locale._number[key]; break }
+    else numberFormat = {}
     setState()
     return true
 }
@@ -126,7 +130,7 @@ i18n.t = (key, sub = null) => {
         return ''
     }
 
-    value = value.replace( // includes
+    value = value.replace( // resolve includes
         /\@\{([^\}]*)\}/g,
         (_, $1) => $1.charAt(0) === '.' ? i18n.t(parentKey + $1) : i18n.t($1)
     )
@@ -143,6 +147,10 @@ function interpolate(tpl, sub, tag) {
     if (typeof sub === 'string') return tpl.replace(new RegExp('\\{' + (tag || 's') + '\\}', 'g'), sub)
     if (typeof sub === 'boolean') return sub ? tpl : ''
     if (typeof sub !== 'object') return tpl
+    if (sub instanceof Date) return tpl.replace(
+        new RegExp('\\{' + (tag || 'd') + '(?:,([^\\}]+))?\\}', 'g'),
+        (_, $1) => new Intl.DateTimeFormat(code, $1 ? locale._dateTime[$1.trim()] : dateTimeFormat).format(sub)
+    )
     if (sub instanceof Array) {
         sub.forEach((s, i) => tpl = interpolate(tpl, s, i))
         return tpl
