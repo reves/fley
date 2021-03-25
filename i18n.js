@@ -49,10 +49,12 @@ const pluralRules = [
 
 
 // TODO:
-// Number formatting
 // DateTime since: e.g. n minutes ago
-// Separating DateTime or Number value for styling
+// DateTime & Number format to parts:
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/formatToParts
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/formatToParts
 
+// Refactor regexp's (especially Number formatting)
 // Refactor spaghetti code
 // Treat not found key error
 // Move pluralization rule to the locale file?
@@ -65,8 +67,8 @@ let fallback = null
 let locale = null
 let code = ''
 let rule = null
-let dateTimeFormat = {} // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat#parameters
-let numberFormat = {} // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat#parameters
+let dateTimeFormat = {} // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat
+let numberFormat = {} // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat
 
 const [i18n, setState] = State({})
 
@@ -141,8 +143,11 @@ i18n.t = (key, sub = null) => {
 function interpolate(tpl, sub, tag) {
     if (sub == null) return tpl
     if (typeof sub === 'number') return tpl.replace(
-        new RegExp('\\{' + (tag || 'n') + '\\}(?:(\\s*)\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'),
-        (_, $1, $2, $3) => $3 ? $3.replace(new RegExp('\\{' + (tag || 'n') + '\\}', 'g'), sub).split('|', 10)[rule(Math.abs(sub))].trim() : sub + ($1 || '') + ($2 ? $2.split('|', 10)[rule(Math.abs(sub))].trim() : '')
+        new RegExp('\\{' + (tag || 'n') + '(?:,([^\\}]+))?\\}(?:(\\s*)\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'),
+        (_, $1, $2, $3, $4) => {
+            if ($1) sub = new Intl.NumberFormat(code, locale._number[$1.trim()]).format(sub)
+            return $4 ? $4.replace(new RegExp('\\{' + (tag || 'n') + '\\}', 'g'), sub).split('|', 10)[rule(Math.abs(sub))].trim() : sub + ($2 || '') + ($3 ? $3.split('|', 10)[rule(Math.abs(sub))].trim() : '')
+        }
     )
     if (typeof sub === 'string') return tpl.replace(new RegExp('\\{' + (tag || 's') + '\\}', 'g'), sub)
     if (typeof sub === 'boolean') return sub ? tpl : ''
