@@ -30,6 +30,7 @@ export default function State(state = {}) {
             container.prevDependencies = dependencies
         })
 
+        return state
     }
 
     return [state, setState]
