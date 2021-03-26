@@ -86,8 +86,25 @@ i18n.t = (key, substitute = null) => {
     return interpolate(value, substitute)
 }
 
+/**
+ * Usage cases:
+ * 
+ * refference1: '@{key.otherKey}',
+ * refference2: '@{.sameParentKey}',
+ * number1: '{n:format}',
+ * number2: '{n} (book | books)',
+ * number3: '(a book | {n:format} books)',
+ * number4: '(a book | many books)',
+ * string: '{s}',
+ * boolean: 'My answer is {b: yes || no}',
+ * date: 'Published on {d:format}',
+ * array: '{0}, {1} and {2}',
+ * object1: '{a}, {b:format} and {c.x.y}',
+ * object2: 'We bought {a} and {b} (book | books) at the price of {c.x.y:format}',
+ */
 function interpolate(template, sub, tag) {
 
+    if (!template) return ''
     if (sub == null) return template
 
     switch (typeof sub) {
@@ -98,10 +115,10 @@ function interpolate(template, sub, tag) {
                     '(?:\\:([^\\}]+))?\\}(?:\\s*\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'
                 ),
                 (_, $1, $2, $3) => {
-                    return $3 ? interpolate($3.split('|')[pluralRule(Math.abs(sub))].trim(), sub) :
+                    return $3 ? interpolate($3.split('|')[pluralRule(Math.abs(sub))]?.trim(), sub) :
                         (
-                            ($1 ? new Intl.NumberFormat(code, locale.$.numberFormats[$1]).format(sub) : sub) + ' ' +
-                            ($2 ? interpolate($2.split('|')[pluralRule(Math.abs(sub))].trim(), sub) : '')
+                            ($1 ? new Intl.NumberFormat(code, locale.$?.numberFormats?.[$1]).format(sub) : sub) + ' ' +
+                            ($2 ? interpolate($2.split('|')[pluralRule(Math.abs(sub))]?.trim(), sub) : '')
                         )
                 }
             )
@@ -124,7 +141,7 @@ function interpolate(template, sub, tag) {
 
     if (sub instanceof Date) return template.replace(
         new RegExp('\\{' + (tag ?? 'd') + '(?:\\:([^\\}]+))?\\}', 'g'),
-        (_, $1) => new Intl.DateTimeFormat(code, $1 ? locale.$.dateTimeFormats[$1] : {}).format(sub)
+        (_, $1) => new Intl.DateTimeFormat(code, $1 ? locale.$?.dateTimeFormats?.[$1] : {}).format(sub)
     )
 
     if (sub instanceof Array) {
@@ -141,7 +158,4 @@ function getValue(key, object) {
 }
 
 export default i18n
-
-// TODO:
-// DateTime since: e.g. n minutes ago
-// Use something like <lang key=”greeting”/> buit-in ley component, that listens to language state.
+export const t = i18n.t
