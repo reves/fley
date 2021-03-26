@@ -11,7 +11,7 @@ const [router, setState] = State({
     redirectedFrom: ''
 })
 
-router.push = (path) => {
+router.go = (path) => {
     if (path === window.location.pathname) return setState() // Force components update
     window.history.pushState({}, '', path)
     matchRoute(path)
@@ -86,7 +86,7 @@ document.addEventListener('click', event => {
     if (href.length > 1 && href[href.length - 1] === '/') href = href.substring(0, href.length - 1)
 
     event.preventDefault()
-    router.push(href)
+    router.go(href)
 
     return false
 })

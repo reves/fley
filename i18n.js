@@ -14,12 +14,13 @@ import State from './State'
  */
 
 let locales = {}
-let code = ''
-let locale = null
-let fallback = null
-let pluralRule = null
 
-const [i18n, setState] = State()
+const [i18n, setState] = State({
+    code: '',
+    locale: {},
+    fallback: {},
+    pluralRule: null
+})
 
 i18n.define = (newLocales) => {
 
@@ -29,35 +30,37 @@ i18n.define = (newLocales) => {
     let fallbackCode = ''
 
     for (const key in locales) {
-        fallback = locales[key]
+        i18n.fallback = locales[key]
         fallbackCode = key
         break
     }
 
     // Detect locale from the cookie
-    if (i18n.setLocale(code = getCookie('lang'))) return
+    if (i18n.setLocale(getCookie('lang'))) return
 
     // Detect locale from the browser
-    if (i18n.setLocale(code = navigator.language)) return
+    if (i18n.setLocale(navigator.language)) return
 
     // Use the fallback locale
-    i18n.setLocale(code = fallbackCode)
+    i18n.setLocale(fallbackCode)
 }
 
-i18n.setLocale = (newCode) => {
+i18n.setLocale = (code) => {
 
-    if (!locales.hasOwnProperty(newCode)) return false
+    if (!locales.hasOwnProperty(code)) return false
 
-    code = newCode
-    locale = locales[code]
-    pluralRule = locale.$?.pluralRule ?? (n => n == 1 ? 0 : 1)
     document.cookie = 'lang=' + code + ';path=/;max-age=31536000;secure;samesite=Lax'
-    setState()
+
+    const locale = locales[code]
+
+    setState({
+        code,
+        locale,
+        pluralRule: locale.$?.pluralRule ?? (n => n == 1 ? 0 : 1)
+    })
 
     return true
 }
-
-i18n.getCode = _ => code
 
 i18n.getLocales = _ => {
     const list = []
@@ -70,10 +73,10 @@ i18n.t = (key, substitute = null) => {
     const prefix = key.replace(/\.[^\.]*$/, '')
     const keyDefault = prefix ? prefix + '._' : '_'
 
-    let value = getValue(key, locale) ||
-                getValue(keyDefault, locale) ||
-                getValue(key, fallback) || 
-                getValue(keyDefault, fallback)
+    let value = getValue(key, i18n.locale) ||
+                getValue(keyDefault, i18n.locale) ||
+                getValue(key, i18n.fallback) || 
+                getValue(keyDefault, i18n.fallback)
 
     if (value == null) return ''
 
@@ -115,10 +118,11 @@ function interpolate(template, sub, tag) {
                     '(?:\\:([^\\}]+))?\\}(?:\\s*\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'
                 ),
                 (_, $1, $2, $3) => {
-                    return $3 ? interpolate($3.split('|')[pluralRule(Math.abs(sub))]?.trim(), sub) :
+                    return $3 ? interpolate($3.split('|')[i18n.pluralRule(Math.abs(sub))]?.trim(), sub) :
                         (
-                            ($1 ? new Intl.NumberFormat(code, locale.$?.numberFormats?.[$1]).format(sub) : sub) + ' ' +
-                            ($2 ? interpolate($2.split('|')[pluralRule(Math.abs(sub))]?.trim(), sub) : '')
+                            ($1 ? new Intl.NumberFormat(i18n.code, i18n.locale.$?.numberFormats?.[$1]).format(sub) : sub) +
+                            ' ' +
+                            ($2 ? interpolate($2.split('|')[i18n.pluralRule(Math.abs(sub))]?.trim(), sub) : '')
                         )
                 }
             )
@@ -141,7 +145,7 @@ function interpolate(template, sub, tag) {
 
     if (sub instanceof Date) return template.replace(
         new RegExp('\\{' + (tag ?? 'd') + '(?:\\:([^\\}]+))?\\}', 'g'),
-        (_, $1) => new Intl.DateTimeFormat(code, $1 ? locale.$?.dateTimeFormats?.[$1] : {}).format(sub)
+        (_, $1) => new Intl.DateTimeFormat(i18n.code, $1 ? i18n.locale.$?.dateTimeFormats?.[$1] : {}).format(sub)
     )
 
     if (sub instanceof Array) {
