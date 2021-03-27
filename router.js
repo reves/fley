@@ -11,13 +11,13 @@ const [router, setState] = State({
     redirectedFrom: ''
 })
 
-router.go = (path) => {
+router.go = function(path) {
     if (path === window.location.pathname) return setState() // Force components update
     window.history.pushState({}, '', path)
     matchRoute(path)
 }
 
-router.define = (newRoutes = {}) => {
+router.define = function(newRoutes = {}) {
     routes = newRoutes
     matchRoute(window.location.pathname)
 }

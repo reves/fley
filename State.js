@@ -1,15 +1,21 @@
 import { is } from './utils'
 import update from './container/update'
 
-export default function State(state = {}) {
+export const statesWatchers = new WeakMap()
 
-    state._watchers = []
+export default function State(state) {
 
-    function setState(newState = {}) {
+    const watchers = []
 
+    state = new Object(state)
+    statesWatchers.set(state, watchers)
+
+    function setState(newState) {
+
+        newState = new Object(newState)
         Object.assign(state, newState)
 
-        state._watchers.forEach(container => {
+        watchers.forEach(container => {
 
             if (container.getDependencies == null) return update(container)
             if (typeof container.getDependencies !== 'function') return

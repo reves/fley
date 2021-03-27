@@ -1,7 +1,7 @@
 import render from './container/render'
 import Component from './container/types/Component'
 
-export default (rootElementId, container) => {
+export default function (rootElementId, container) {
 
     const rootElement = document.getElementById(rootElementId)
     const rootContainer = new Component(() => container)

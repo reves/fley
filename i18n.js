@@ -22,7 +22,7 @@ const [i18n, setState] = State({
     pluralRule: null
 })
 
-i18n.define = (newLocales) => {
+i18n.define = function(newLocales) {
 
     locales = newLocales
 
@@ -30,22 +30,22 @@ i18n.define = (newLocales) => {
     let fallbackCode = ''
 
     for (const key in locales) {
-        i18n.fallback = locales[key]
+        this.fallback = locales[key]
         fallbackCode = key
         break
     }
 
     // Detect locale from the cookie
-    if (i18n.setLocale(getCookie('lang'))) return
+    if (this.setLocale(getCookie('lang'))) return
 
     // Detect locale from the browser
-    if (i18n.setLocale(navigator.language)) return
+    if (this.setLocale(navigator.language)) return
 
     // Use the fallback locale
-    i18n.setLocale(fallbackCode)
+    this.setLocale(fallbackCode)
 }
 
-i18n.setLocale = (code) => {
+i18n.setLocale = function(code) {
 
     if (!locales.hasOwnProperty(code)) return false
 
@@ -62,28 +62,28 @@ i18n.setLocale = (code) => {
     return true
 }
 
-i18n.getLocales = _ => {
+i18n.getLocales = function() {
     const list = []
     for (const key in locales) list.push([key, (locales[key].$?.name ?? '')])
     return list
 }
 
-i18n.t = (key, substitute = null) => {
+i18n.t = function(key, substitute = null) {
 
     const prefix = key.replace(/\.[^\.]*$/, '')
     const keyDefault = prefix ? prefix + '._' : '_'
 
-    let value = getValue(key, i18n.locale) ||
-                getValue(keyDefault, i18n.locale) ||
-                getValue(key, i18n.fallback) || 
-                getValue(keyDefault, i18n.fallback)
+    let value = getValue(key, this.locale) ||
+                getValue(keyDefault, this.locale) ||
+                getValue(key, this.fallback) || 
+                getValue(keyDefault, this.fallback)
 
     if (value == null) return ''
 
     // Resolve references
     value = value.replace(
         /\@\{([^\}]*)\}/g,
-        (_, $1) => $1.charAt(0) === '.' ? i18n.t(prefix + $1) : i18n.t($1)
+        (_, $1) => $1.charAt(0) === '.' ? this.t(prefix + $1) : this.t($1)
     )
 
     return interpolate(value, substitute)

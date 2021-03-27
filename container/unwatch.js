@@ -1,3 +1,4 @@
+import { statesWatchers } from './../State'
 import Component from './types/Component'
 
 export default function unwatch(container) {
@@ -7,9 +8,10 @@ export default function unwatch(container) {
     if (!container.dynamic) return
 
     container.watching.forEach(state => {
-        const index = state._watchers.indexOf(container)
+        const watchers = statesWatchers.get(state)
+        const index = watchers.indexOf(container)
         if (index === -1) return
-        state._watchers.splice(index, 1)
+        watchers.splice(index, 1)
     })
 
     unwatch(container.children)
