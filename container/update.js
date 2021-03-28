@@ -1,4 +1,4 @@
-import Component from './types/Component'
+import Component, { setPreviousComponent } from './types/Component'
 import Value from './types/Value'
 import unwatch from './unwatch'
 import render from './render'
@@ -7,10 +7,11 @@ export default function update(container) {
 
     // Skip value containers
     if (container instanceof Value) return
-    
+
     // Update component elements
     if (container instanceof Component) {
 
+        setPreviousComponent(container)
         const updatedContainer = new Component(container.origin, container.props)
         unwatch(container.component)
 

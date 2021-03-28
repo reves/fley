@@ -1,13 +1,12 @@
 import render from './container/render'
-import Component from './container/types/Component'
 
 export default function (rootElementId, container) {
 
     const rootElement = document.getElementById(rootElementId)
-    const rootContainer = new Component(() => container)
+    const fragment = document.createDocumentFragment()
 
-    render(rootContainer, rootContainer.node = document.createDocumentFragment())
+    render(container, fragment)
     rootElement.innerHTML = ''
-    rootElement.appendChild(rootContainer.node)
+    rootElement.appendChild(fragment)
     
 }

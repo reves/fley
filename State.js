@@ -1,18 +1,36 @@
 import { is } from './utils'
 import update from './container/update'
+import { currentComponent, previousComponent } from './container/types/Component'
 
 export const statesWatchers = new WeakMap()
 
-export default function State(state) {
+window.states = statesWatchers
 
+export default function State(initialState) {
+
+    let state = (previousComponent && previousComponent.states.length) ? previousComponent.states.shift() : {s: initialState}
+
+    if (currentComponent) {
+
+        currentComponent.states.push(state)
+
+        const actualComponent = currentComponent
+
+        function setState(newState) {
+            state.s = newState
+            update(actualComponent)
+        }
+
+        return [state.s, setState]
+    }
+
+    state = initialState
     const watchers = []
 
-    state = new Object(state)
     statesWatchers.set(state, watchers)
 
-    function setState(newState) {
+    function setState(newState = {}) {
 
-        newState = new Object(newState)
         Object.assign(state, newState)
 
         watchers.forEach(container => {
@@ -40,4 +58,11 @@ export default function State(state) {
     }
 
     return [state, setState]
+}
+
+export function watch(state) {
+    const watchers = statesWatchers.get(state)
+    const index = watchers.indexOf(previousComponent)
+    if (index !== -1) watchers.splice(index, 1)
+    watchers.push(currentComponent)
 }
