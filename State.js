@@ -8,13 +8,12 @@ window.states = statesWatchers
 
 export default function State(initialState) {
 
-    let state = (previousComponent && previousComponent.states.length) ? previousComponent.states.shift() : {s: initialState}
-
     if (currentComponent) {
 
-        currentComponent.states.push(state)
-
+        const state = (previousComponent && previousComponent.states.length) ? previousComponent.states.shift() : {s: initialState}
         const actualComponent = currentComponent
+
+        currentComponent.states.push(state)
 
         function setState(newState) {
             state.s = newState
@@ -24,7 +23,7 @@ export default function State(initialState) {
         return [state.s, setState]
     }
 
-    state = initialState
+    const state = initialState
     const watchers = []
 
     statesWatchers.set(state, watchers)

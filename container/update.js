@@ -1,4 +1,5 @@
 import Component, { setPreviousComponent } from './types/Component'
+import Element from './types/Element'
 import Value from './types/Value'
 import unwatch from './unwatch'
 import render from './render'
@@ -22,6 +23,7 @@ export default function update(container) {
             replaceKeyed(container.component, updatedContainer.component)
         }
 
+        container.states = updatedContainer.states
         container.component = updatedContainer.component
         container.childKeys = updatedContainer.childKeys
         return
@@ -53,13 +55,31 @@ export default function update(container) {
 
 function replace(currentContainers, newContainers) {
 
+    if (!currentContainers.length || !newContainers.length) return
+
     const parentNode = currentContainers[0].node.parentNode
 
     for (let i=0; ; i++) {
 
         if (currentContainers[i]) {
-            
+
             if (newContainers[i]) {
+
+                if (
+                    currentContainers[i].constructor === newContainers[i].constructor &&
+                    (currentContainers[i] instanceof Element && currentContainers[i].type === newContainers[i].type && !Object.values(currentContainers[i].eventListeners).length) ||
+                    (currentContainers[i] instanceof Value && currentContainers[i].value === newContainers[i].value)
+                ) {
+
+                    if (currentContainers[i] instanceof Element) {
+                        newContainers[i].node = currentContainers[i].node
+                        replace(currentContainers[i].children, newContainers[i].children)
+                        continue
+                    }
+                    newContainers[i].node = currentContainers[i].node
+                    continue
+                }
+                
                 parentNode.replaceChild(newContainers[i].node, currentContainers[i].node)
                 continue
             }

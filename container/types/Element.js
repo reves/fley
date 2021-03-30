@@ -70,7 +70,6 @@ export default class Element
 
             }
         }
-
         normalize(this)
     }
 
