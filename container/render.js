@@ -4,58 +4,53 @@ import watch from './watch'
 
 export default function render(container, parentNode) {
 
-    // Render a value
+    // Value
     if (container instanceof Value) {
         container.node = document.createTextNode(container.value)
         if (parentNode) parentNode.appendChild(container.node)
         return
     }
 
-    if (container instanceof Array) return container.forEach(item => render(item, parentNode))
-    if (container instanceof Component) return render(container.component, parentNode)
+    // Component
+    if (container instanceof Component) return render(container.children, parentNode)
 
-    // Render inline container
+    // Array
+    if (Array.isArray(container)) return container.forEach(item => render(item, parentNode))
+
+    /* // Render inline container
     if (container.inline != null) {
         const temp = document.createElement('div')
         temp.innerHTML = container.inline
         container.node = temp.childNodes[0];
         if (parentNode) parentNode.appendChild(container.node)
         return
-    }
+    } */
 
-    // Render an Element
+    // Element
+
+    // node
     container.node = document.createElement(container.type)
 
-    // Static attributes
-    for (let attr in container.attributes.static) {
-        container.node.setAttribute(attr, container.attributes.static[attr])
+    // attributes
+    for (const attr in container.attributes) {
+        container.node.setAttribute(attr, container.attributes[attr])
     }
 
-    // Dynamic attributes
-    for (let attr in container.attributes.dynamic) {
-        if (attr === 'value') {
-            container.node.value = container.attributes.dynamic[attr]()
-            continue
-        }
-        container.node.setAttribute(attr, container.attributes.dynamic[attr]())
-    }
-
-    // Event listeners
+    // event listeners
     for (let eventType in container.eventListeners) {
-        container.node.addEventListener(eventType, container.eventListeners[eventType].bind(container.node))
+        container.node[eventType] = container.eventListeners[eventType]
     }
 
     // Watch state
-    if (container.dynamic) watch(container)
+    // if (container.dynamic) watch(container)
 
     // Defer onUpdate task
-    if (container.onUpdate) setTimeout(() => container.onUpdate(container.node))
+    // if (container.onUpdate) setTimeout(() => container.onUpdate(container.node))
 
     // Render children or set innerHTML
-    if (container.html != null) {
-        container.node.innerHTML = typeof container.html === 'function' ? container.html() : container.html
-    } else render(container.children, container.node)
+    if (container.html == null) render(container.children, container.node)
+    else container.node.innerHTML = container.html
 
-    // Mount element
+    // Mount the Element
     if (parentNode) parentNode.appendChild(container.node)
 }

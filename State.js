@@ -4,7 +4,7 @@ import { currentComponent, previousComponent } from './container/types/Component
 
 export const statesWatchers = new WeakMap()
 
-window.states = statesWatchers
+window.states = statesWatchers // Debug
 
 export default function State(initialState) {
 

@@ -1,62 +1,50 @@
 import Component from './types/Component'
-import Element from './types/Element'
 import Value from './types/Value'
 
+// https://developer.mozilla.org/en-US/docs/Glossary/Empty_element
+const emptyElements = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']
+
 /**
- * Recursively executes functions and flattens arrays.
- * 
- * Text nodes for values:
- * 1. undefined => empty string
- * 2. null => empty string
- * 3. empty array (instanceof Array and !arr.length) => empty string
- * 4. typeof container != 'object' => Value container
+ * Recursively normalizes the container's subtree:
+ * - flattens Arrays and Components;
+ * - executes functions;
+ * - converts primitives and trivial data types to Value containers:
+ *   1. undefined || null || empty array => empty string
+ *   2. primitive => actual value
  */
 export default function normalize(data, parentContainer) {
 
-    // Trivial data
+    // Convert trivial types
     if (data == null) return [new Value]
 
-    // Function generated data (anonymous component)
-    if (typeof data === 'function') {
-        if (parentContainer instanceof Component) return normalize(data(), parentContainer)
-        if (parentContainer instanceof Element) parentContainer.dynamic = true
-        const container = new Component(data)
-        if (!container.component.length) container.component = [new Value]
-        return [container]
-    }
+    // Execute functions
+    if (typeof data === 'function') return normalize(data(), parentContainer)
 
-    // Primitive data
+    // Convert primitives
     if (typeof data !== 'object') return [new Value(data)]
 
-    // Array data
+    // Flatten arrays
     if (data instanceof Array) {
         if (!data.length) return [new Value]
-        const flat = []
-        data.forEach(items => normalize(items, parentContainer).forEach(item => flat.push(item)))
-        return flat
+        return data.reduce((flat, val) => flat.concat(normalize(val, parentContainer)), [])
     }
 
-    // 
-    // Element or Component:
-    // 
-
-    // Normalize container
+    // Normalize container subtree
     if (!parentContainer) {
-        if (data instanceof Element) data.children = normalize(data.children, data)
-        else data.component = normalize(data.component, data)
+        if (!Array.isArray(data.children)) data.children = [].concat(data.children)
+        if (emptyElements.indexOf(data.type) === -1) data.children = normalize(data.children, data)
         return data
     }
 
-    // Set parent container dynamic or flatten a Component
-    if (parentContainer instanceof Element) {
-        if(data.dynamic || data instanceof Component) parentContainer.dynamic = true
-    } else if (data instanceof Component) return data.component
+    // Flatten Components
+    if (data instanceof Component) return data.children
 
-    // Filter duplicate keys
+    // Filter Elements that have duplicate keys
     if (data.key != null) {
         if (parentContainer.childKeys.indexOf(data.key) !== -1) return []
         parentContainer.childKeys.push(data.key)
     }
 
+    // Return the Element
     return [data]
 }

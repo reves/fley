@@ -4,58 +4,27 @@ import Value from './types/Value'
 import unwatch from './unwatch'
 import render from './render'
 
-export default function update(container) {
+export default function update(currentComponent) {
 
-    // Skip value containers
-    if (container instanceof Value) return
+    const updatedComponent = new Component(currentComponent.origin, currentComponent.props)
 
-    // Update component elements
-    if (container instanceof Component) {
+    replaceChildren(currentComponent, updatedComponent)
+    currentComponent.children = updatedComponent.children
+}
 
-        setPreviousComponent(container)
-        const updatedContainer = new Component(container.origin, container.props)
-        unwatch(container.component)
+function replaceChildren(currentContainer, newContainer) {
 
-        if (!container.childKeys.length || !updatedContainer.childKeys.length) {
-            render(updatedContainer.component)
-            replace(container.component, updatedContainer.component)
-        } else {
-            replaceKeyed(container.component, updatedContainer.component)
-        }
+    if (!currentContainer.children.length) return
 
-        container.states = updatedContainer.states
-        container.component = updatedContainer.component
-        container.childKeys = updatedContainer.childKeys
+    if (currentContainer.childKeys.length || newContainer.childKeys.length) {
+        replaceKeyed(currentContainer.children, newContainer.children)
         return
     }
 
-    // Defer onUpdate task
-    if (container.onUpdate) setTimeout(() => container.onUpdate(container.node))
-
-    // Dynamic attributes
-    for (let attr in container.attributes.dynamic) {
-        if (attr === 'value') {
-            container.node.value = container.attributes.dynamic[attr]()
-            continue
-        }
-        container.node.setAttribute(attr, container.attributes.dynamic[attr]())
-    }
-
-    // Update innerHTML
-    if (typeof container.html === 'function') {
-        container.node.innerHTML = container.html()
-        return
-    }
-
-    // Update children
-    if (!container.dynamic) return
-    container.childKeys = []
-    container.children.forEach(child => update(child))
+    replace(currentContainer.children, newContainer.children)
 }
 
 function replace(currentContainers, newContainers) {
-
-    if (!currentContainers.length || !newContainers.length) return
 
     const parentNode = currentContainers[0].node.parentNode
 
@@ -65,21 +34,8 @@ function replace(currentContainers, newContainers) {
 
             if (newContainers[i]) {
 
-                if (
-                    currentContainers[i].constructor === newContainers[i].constructor &&
-                    (currentContainers[i] instanceof Element && currentContainers[i].type === newContainers[i].type && !Object.values(currentContainers[i].eventListeners).length) ||
-                    (currentContainers[i] instanceof Value && currentContainers[i].value === newContainers[i].value)
-                ) {
-
-                    if (currentContainers[i] instanceof Element) {
-                        newContainers[i].node = currentContainers[i].node
-                        replace(currentContainers[i].children, newContainers[i].children)
-                        continue
-                    }
-                    newContainers[i].node = currentContainers[i].node
-                    continue
-                }
-                
+                if (diff(currentContainers[i], newContainers[i])) continue
+                render(newContainers[i])
                 parentNode.replaceChild(newContainers[i].node, currentContainers[i].node)
                 continue
             }
@@ -90,14 +46,16 @@ function replace(currentContainers, newContainers) {
 
         if (newContainers[i]) {
             const fragment = document.createDocumentFragment()
-            for ( ; i<newContainers.length; i++) fragment.appendChild(newContainers[i].node)
+            for ( ; i<newContainers.length; i++) {
+                render(newContainers[i])
+                fragment.appendChild(newContainers[i].node)
+            }
             parentNode.appendChild(fragment)
             return
         }
 
         return
     }
-
 }
 
 function replaceKeyed(currentContainers, newContainers) {
@@ -122,6 +80,7 @@ function replaceKeyed(currentContainers, newContainers) {
 
     // Replaces the current container with the new container
     const replaceWithNew = (i) => {
+        if (diff(currentContainers[i], newContainers[i])) return
         render(newContainers[i])
         parentNode.replaceChild(newContainers[i].node, currentContainers[i].node)
     }
@@ -202,7 +161,7 @@ function replaceKeyed(currentContainers, newContainers) {
                         continue
                     }
 
-                    // The key of the new container wasn't found, so replace with the new container
+                    // The key of the current container wasn't found, so replace with the new container
                     replaceWithNew(i)
                     continue
                 }
@@ -218,8 +177,8 @@ function replaceKeyed(currentContainers, newContainers) {
                         continue
                     }
 
-                    // The key of the existing new container wasn't found, so replace with the new container
-                    // ...
+                    // The key of the existing new container wasn't found, so replace with the new container:
+                    // --->
                 }
 
                 // Non-keyed current container and non-keyed new container, so replace with the new container
@@ -247,4 +206,93 @@ function replaceKeyed(currentContainers, newContainers) {
         return
     }
 
+}
+
+function diff(currentContainer, newContainer) {
+
+    // Skip same containers from props.children of a Component
+    if (currentContainer.node === newContainer.node) return true
+
+    // Same type containers
+    if (currentContainer.constructor === newContainer.constructor) {
+
+        // Skip same Value containers
+        if (currentContainer instanceof Value && currentContainer.value === newContainer.value) {
+            newContainer.node = currentContainer.node
+            return true
+        }
+
+        // Update same type Elements
+        if (currentContainer instanceof Element && currentContainer.type === newContainer.type) {
+
+            // node
+            newContainer.node = currentContainer.node
+
+            // attributes
+
+            for (const attr in currentContainer.attributes) {
+                
+                // the attribute exists in the new container
+                if (newContainer.attributes[attr] != null) {
+
+                    // skip same attribute values
+                    if (currentContainer.attributes[attr] === newContainer.attributes[attr]) return true
+
+                    // update attribute values
+                    currentContainer.node.setAttribute(attr, newContainer.attributes[attr])
+                    return true
+                }
+
+                // remove the current container attributes not present in the new container
+                currentContainer.node.removeAttribute(attr)
+
+            }
+
+            for (const attr in newContainer.attributes) {
+
+                // skip already processed attributes
+                if (currentContainer.attributes[attr] != null) return true
+
+                // set the new attributes
+                currentContainer.node.setAttribute(attr, newContainer.attributes[attr])
+
+            }
+
+            // event listeners
+
+            for (let eventType in currentContainer.eventListeners) {
+                currentContainer.node[eventType] = null
+            }
+
+            for (let eventType in newContainer.eventListeners) {
+                currentContainer.node[eventType] = newContainer.eventListeners[eventType]
+            }
+
+            // Defer onUpdate task
+            // ...
+
+            // Replace children or set/update innerHTML
+
+            if (newContainer.html != null) {
+                currentContainer.node.innerHTML = newContainer.html
+                return true
+            }
+
+            if (currentContainer.html != null) {
+                const fragment = document.createDocumentFragment()
+                for (let i=0; i<newContainer.children.length; i++) {
+                        render(newContainer.children[i])
+                        fragment.appendChild(newContainer.children[i].node)
+                }
+                currentContainer.node.innerHTML = ''
+                currentContainer.node.appendChild(fragment)
+                return true
+            }
+
+            replaceChildren(currentContainer, newContainer)
+            return true
+        }
+    }
+
+    return false
 }
