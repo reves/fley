@@ -1,4 +1,5 @@
 import Component from './types/Component'
+import Inline from './types/Inline'
 import Value from './types/Value'
 
 // https://developer.mozilla.org/en-US/docs/Glossary/Empty_element
@@ -28,6 +29,9 @@ export default function normalize(data, parentContainer) {
         if (!data.length) return [new Value]
         return data.reduce((flat, val) => flat.concat(normalize(val, parentContainer)), [])
     }
+
+    // Convert object to Inline container
+    if (data.inline != null) return [new Inline(data.inline)]
 
     // Normalize container subtree
     if (!parentContainer) {

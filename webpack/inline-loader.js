@@ -1,9 +1,3 @@
-module.exports = function (source) {
-    
-    const container = {
-        node: null,
-        inline: source
-    }
-
-    return `module.exports = () => {return ${JSON.stringify(container)}}`;
+module.exports = function (inline) {
+    return `module.exports = ${JSON.stringify({inline})}`;
 }

@@ -1,6 +1,6 @@
 import Component from './types/Component'
+import Inline from './types/Inline'
 import Value from './types/Value'
-import watch from './watch'
 
 export default function render(container, parentNode) {
 
@@ -17,14 +17,14 @@ export default function render(container, parentNode) {
     // Array
     if (Array.isArray(container)) return container.forEach(item => render(item, parentNode))
 
-    /* // Render inline container
-    if (container.inline != null) {
+    // Inline
+    if (container instanceof Inline) {
         const temp = document.createElement('div')
         temp.innerHTML = container.inline
         container.node = temp.childNodes[0];
         if (parentNode) parentNode.appendChild(container.node)
         return
-    } */
+    }
 
     // Element
 
@@ -40,9 +40,6 @@ export default function render(container, parentNode) {
     for (let eventType in container.eventListeners) {
         container.node[eventType] = container.eventListeners[eventType]
     }
-
-    // Watch state
-    // if (container.dynamic) watch(container)
 
     // Defer onUpdate task
     // if (container.onUpdate) setTimeout(() => container.onUpdate(container.node))

@@ -1,5 +1,6 @@
 import Component, { setPreviousComponent } from './types/Component'
 import Element from './types/Element'
+import Inline from './types/Inline'
 import Value from './types/Value'
 import unwatch from './unwatch'
 import render from './render'
@@ -218,6 +219,12 @@ function diff(currentContainer, newContainer) {
 
         // Skip same Value containers
         if (currentContainer instanceof Value && currentContainer.value === newContainer.value) {
+            newContainer.node = currentContainer.node
+            return true
+        }
+
+        // Skip same Inline containers
+        if (currentContainer instanceof Inline && currentContainer.inline === newContainer.inline) {
             newContainer.node = currentContainer.node
             return true
         }

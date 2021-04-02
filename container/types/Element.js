@@ -12,7 +12,6 @@ export default class Element
         this.key = key
         this.childKeys = []
         this.html = null
-        // this.watching = []
         // this.onUpdate = null
 
         for (let prop in props) {
