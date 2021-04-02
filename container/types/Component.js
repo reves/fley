@@ -6,11 +6,11 @@ export let previousComponent = null
 export function setPreviousComponent(component) {
     return previousComponent = component
 } */
-window.components = []
+window.components = [] // Debug
 export default class Component
 {
     constructor(origin, props) {
-        window.components.push(this)
+        window.components.push(this) // Debug
         // currentComponent = this
 
         // this.watching = []

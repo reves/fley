@@ -236,11 +236,11 @@ function diff(currentContainer, newContainer) {
                 if (newContainer.attributes[attr] != null) {
 
                     // skip same attribute values
-                    if (currentContainer.attributes[attr] === newContainer.attributes[attr]) return true
+                    if (currentContainer.attributes[attr] === newContainer.attributes[attr]) continue
 
                     // update attribute values
                     currentContainer.node.setAttribute(attr, newContainer.attributes[attr])
-                    return true
+                    continue
                 }
 
                 // remove the current container attributes not present in the new container
@@ -250,8 +250,13 @@ function diff(currentContainer, newContainer) {
 
             for (const attr in newContainer.attributes) {
 
+                if (attr === 'value') {
+                    currentContainer.node.value = newContainer.attributes[attr]
+                    continue
+                }
+
                 // skip already processed attributes
-                if (currentContainer.attributes[attr] != null) return true
+                if (currentContainer.attributes[attr] != null) continue
 
                 // set the new attributes
                 currentContainer.node.setAttribute(attr, newContainer.attributes[attr])
