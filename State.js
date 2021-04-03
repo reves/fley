@@ -9,17 +9,17 @@ export default function State(initialState) {
     // Create a local state, or use the previous one when updating the Component
     if (currentComponent) {
 
-        const actualComponent = currentComponent // save refference
+        const actualComponent = currentComponent // preserve the reference
         const previousStates = actualComponent.previousStates
-        const state = (previousStates.length) ? previousStates.shift() : {s: initialState}
+        const state = (previousStates.length) ? previousStates.shift() : initialState
+        const index = actualComponent.states.push(state) - 1
 
         const setState = data => {
-            state.s = data
+            actualComponent.states[index] = data
             actualComponent.update()
         }
 
-        actualComponent.states.push(state)
-        return [state.s, setState]
+        return [state, setState]
     }
 
     // Create a global state
@@ -27,7 +27,7 @@ export default function State(initialState) {
     const watchers = []
     const setState = (data) => {
 
-        if (typeof data === 'function') data(state)
+        if (typeof data === 'function') data(state) // data = data(state) <--- TODO
         else Object.assign(state, data)
 
         watchers.forEach(container => update(container))
