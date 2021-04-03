@@ -41,9 +41,7 @@ export default function normalize(data, parentContainer) {
     }
 
     // Flatten Components
-    if (data instanceof Component) {
-        return data.children
-    }
+    if (data instanceof Component) return data.children
 
     // Filter Elements that have duplicate keys
     if (data.key != null) {

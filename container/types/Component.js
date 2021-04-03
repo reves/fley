@@ -16,7 +16,16 @@ export default class Component
         this.previousStates = null
         currentComponent = null
 
-        this.update = () => reconcile(this, new Component(origin, props, this.states))
+        this.update = () => {
+
+            const updatedComponent = new Component(origin, props, this.states)
+
+            reconcile(this, updatedComponent)
+
+            this.states = updatedComponent.states
+            this.children = updatedComponent.children
+            this.childKeys = updatedComponent.childKeys
+        }
 
         normalize(this)
 
