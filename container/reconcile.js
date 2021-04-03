@@ -1,19 +1,9 @@
-import Component, { setPreviousComponent } from './types/Component'
 import Element from './types/Element'
 import Inline from './types/Inline'
 import Value from './types/Value'
-import unwatch from './unwatch'
 import render from './render'
 
-export default function update(currentComponent) {
-
-    const updatedComponent = new Component(currentComponent.origin, currentComponent.props)
-
-    replaceChildren(currentComponent, updatedComponent)
-    currentComponent.children = updatedComponent.children
-}
-
-function replaceChildren(currentContainer, newContainer) {
+export default function reconcile(currentContainer, newContainer) {
 
     if (!currentContainer.children.length) return
 
@@ -246,19 +236,19 @@ function diff(currentContainer, newContainer) {
                     if (currentContainer.attributes[attr] === newContainer.attributes[attr]) continue
 
                     // update attribute values
-                    currentContainer.node.setAttribute(attr, newContainer.attributes[attr])
+                    newContainer.node.setAttribute(attr, newContainer.attributes[attr])
                     continue
                 }
 
                 // remove the current container attributes not present in the new container
-                currentContainer.node.removeAttribute(attr)
+                newContainer.node.removeAttribute(attr)
 
             }
 
             for (const attr in newContainer.attributes) {
 
                 if (attr === 'value') {
-                    currentContainer.node.value = newContainer.attributes[attr]
+                    newContainer.node.value = newContainer.attributes[attr]
                     continue
                 }
 
@@ -266,27 +256,24 @@ function diff(currentContainer, newContainer) {
                 if (currentContainer.attributes[attr] != null) continue
 
                 // set the new attributes
-                currentContainer.node.setAttribute(attr, newContainer.attributes[attr])
+                newContainer.node.setAttribute(attr, newContainer.attributes[attr])
 
             }
 
             // event listeners
 
             for (let eventType in currentContainer.eventListeners) {
-                currentContainer.node[eventType] = null
+                newContainer.node[eventType] = null
             }
 
             for (let eventType in newContainer.eventListeners) {
-                currentContainer.node[eventType] = newContainer.eventListeners[eventType]
+                newContainer.node[eventType] = newContainer.eventListeners[eventType]
             }
-
-            // Defer onUpdate task
-            // ...
 
             // Replace children or set/update innerHTML
 
             if (newContainer.html != null) {
-                currentContainer.node.innerHTML = newContainer.html
+                newContainer.node.innerHTML = newContainer.html
                 return true
             }
 
@@ -296,12 +283,12 @@ function diff(currentContainer, newContainer) {
                         render(newContainer.children[i])
                         fragment.appendChild(newContainer.children[i].node)
                 }
-                currentContainer.node.innerHTML = ''
-                currentContainer.node.appendChild(fragment)
+                newContainer.node.innerHTML = ''
+                newContainer.node.appendChild(fragment)
                 return true
             }
 
-            replaceChildren(currentContainer, newContainer)
+            reconcile(currentContainer, newContainer)
             return true
         }
     }

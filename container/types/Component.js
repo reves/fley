@@ -1,26 +1,25 @@
 import normalize from '../normalize'
+import reconcile from '../reconcile'
 
-/* export let currentComponent = null
-export let previousComponent = null
+export let currentComponent = null
 
-export function setPreviousComponent(component) {
-    return previousComponent = component
-} */
-window.components = [] // Debug
 export default class Component
 {
-    constructor(origin, props) {
-        window.components.push(this) // Debug
-        // currentComponent = this
+    constructor(origin, props, previousStates = []) {
 
-        // this.watching = []
-        // this.states = []
-        this.children = origin(props)
-        this.origin = origin
-        this.props = props
+        this.previousStates = previousStates
+        this.states = []
         this.childKeys = []
 
+        currentComponent = this
+        this.children = origin(props)
+        this.previousStates = null
+        currentComponent = null
+
+        this.update = () => reconcile(this, new Component(origin, props, this.states))
+
         normalize(this)
+
     }
 
 }

@@ -12,7 +12,6 @@ export default class Element
         this.key = key
         this.childKeys = []
         this.html = null
-        // this.onUpdate = null
 
         for (let prop in props) {
 
@@ -22,10 +21,6 @@ export default class Element
                 case 'html':
                     this.html = (typeof props[prop] === 'function') ? props[prop]() : props[prop]
                     continue
-
-                /*case 'onUpdate':
-                    this.onUpdate = props[prop]
-                    continue */
 
                 case 'children':
                     this.children = props[prop]

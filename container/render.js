@@ -41,9 +41,6 @@ export default function render(container, parentNode) {
         container.node[eventType] = container.eventListeners[eventType]
     }
 
-    // Defer onUpdate task
-    // if (container.onUpdate) setTimeout(() => container.onUpdate(container.node))
-
     // Render children or set innerHTML
     if (container.html == null) render(container.children, container.node)
     else container.node.innerHTML = container.html

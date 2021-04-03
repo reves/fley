@@ -1,67 +1,56 @@
-import { is } from './utils'
-import update from './container/update'
-import { currentComponent, previousComponent } from './container/types/Component'
+import { currentComponent } from './container/types/Component'
 
-export const statesWatchers = new WeakMap()
+// export const statesWatchers = new WeakMap()
 
-window.states = statesWatchers // Debug
+// window.states = statesWatchers // Debug
 
 export default function State(initialState) {
 
+    // Create a local state, or use the previous one when updating the Component
     if (currentComponent) {
 
-        const state = (previousComponent && previousComponent.states.length) ? previousComponent.states.shift() : {s: initialState}
-        const actualComponent = currentComponent
+        const actualComponent = currentComponent // save refference
+        const previousStates = actualComponent.previousStates
+        const state = (previousStates.length) ? previousStates.shift() : {s: initialState}
 
-        currentComponent.states.push(state)
-
-        function setState(newState) {
-            state.s = newState
-            update(actualComponent)
+        const setState = data => {
+            state.s = data
+            actualComponent.update()
         }
 
+        actualComponent.states.push(state)
         return [state.s, setState]
     }
 
-    const state = initialState
+    // Create a global state
+    /* const state = initialState || {}
     const watchers = []
+    const setState = (data) => {
 
-    statesWatchers.set(state, watchers)
+        if (typeof data === 'function') data(state)
+        else Object.assign(state, data)
 
-    function setState(newState = {}) {
-
-        Object.assign(state, newState)
-
-        watchers.forEach(container => {
-
-            if (container.getDependencies == null) return update(container)
-            if (typeof container.getDependencies !== 'function') return
-
-            let diff = false
-            let dependencies = container.getDependencies()
-            dependencies = (dependencies instanceof Array) ? dependencies : [dependencies]
-
-            for (let i=0; i<container.prevDependencies.length; i++) {
-
-                if (!is(container.prevDependencies[i], dependencies[i])) {
-                    diff = true
-                    break
-                }
-            }
-
-            diff && update(container)
-            container.prevDependencies = dependencies
-        })
-
+        watchers.forEach(container => update(container))
         return state
     }
 
-    return [state, setState]
+    statesWatchers.set(state, watchers)
+    return [state, setState] */
 }
 
-export function watch(state) {
+/* export function watch(state) {
     const watchers = statesWatchers.get(state)
-    const index = watchers.indexOf(previousComponent)
-    if (index !== -1) watchers.splice(index, 1)
-    watchers.push(currentComponent)
+    currentComponent.watching.push(state)
+    if (previousComponent && watchers.indexOf(previousComponent) !== -1) return
+    watchers.unshift(currentComponent)
 }
+
+export function unwatch(subComponents) {
+    subComponents.forEach(component => {
+        component.watching.forEach(state => {
+            const watchers = statesWatchers.get(state)
+            const index = watchers.indexOf(component)
+            if (index !== -1) watchers.splice(index, 1)
+        })
+    })
+} */
