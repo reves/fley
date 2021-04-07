@@ -12,6 +12,7 @@ export default class Element
         this.key = key
         this.childKeys = []
         this.html = null
+        this.props = props
 
         for (let prop in props) {
 

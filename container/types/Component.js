@@ -1,29 +1,38 @@
 import normalize from '../normalize'
 import reconcile from '../reconcile'
+import clone from '../clone'
 
 export let currentComponent = null
 
 export default class Component
 {
-    constructor(origin, props, previousStates = []) {
+    constructor(origin, props, key, previousComponent) {
 
-        this.previousStates = previousStates
+        if (!previousComponent && props && props.children) {
+            const children = props.children
+            props.children = () => clone(children)
+        }
+
+        this.previousComponent = previousComponent
         this.states = []
+        this.watching = []
         this.childKeys = []
-
+        this.key = key
+        this.props = props
+        this.origin = origin
         currentComponent = this
         this.children = origin(props)
-        this.previousStates = null
+        this.previousComponent = null
         currentComponent = null
 
-        this.update = () => {
+        this.update = (newProps = props, newKey = key) => {
 
-            const updatedComponent = new Component(origin, props, this.states)
+            const updatedComponent = new Component(origin, newProps, newKey, this)
 
             reconcile(this, updatedComponent)
 
             this.states = updatedComponent.states
-            this.children = updatedComponent.children
+            this.watching = updatedComponent.watching
             this.childKeys = updatedComponent.childKeys
         }
 

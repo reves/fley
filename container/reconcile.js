@@ -1,3 +1,4 @@
+import Component from './types/Component'
 import Element from './types/Element'
 import Inline from './types/Inline'
 import Value from './types/Value'
@@ -7,7 +8,7 @@ export default function reconcile(currentContainer, newContainer) {
 
     if (!currentContainer.children.length) return
 
-    if (currentContainer.childKeys.length || newContainer.childKeys.length) {
+    if (currentContainer.childKeys.length && newContainer.childKeys.length) {
         replaceKeyed(currentContainer.children, newContainer.children)
         return
     }
@@ -17,69 +18,170 @@ export default function reconcile(currentContainer, newContainer) {
 
 function replace(currentContainers, newContainers) {
 
-    const parentNode = currentContainers[0].node.parentNode
+    const parentNode = (currentContainers[0] instanceof Component)
+        ? currentContainers[0].children[0].node.parentNode
+        : currentContainers[0].node.parentNode
 
     for (let i=0; ; i++) {
 
         if (currentContainers[i]) {
 
+            // Both containers exist
             if (newContainers[i]) {
-
-                if (diff(currentContainers[i], newContainers[i])) continue
+                if (diff(currentContainers, newContainers, i)) continue
                 render(newContainers[i])
                 parentNode.replaceChild(newContainers[i].node, currentContainers[i].node)
+                currentContainers[i] = newContainers[i]
                 continue
             }
 
-            parentNode.removeChild(currentContainers[i].node)
-            continue
+            // No more new containers, so remove the remaining current containers
+            for (let j=currentContainers.length-1; j>=i; j--) {
+                if (currentContainers[j] instanceof Component) {
+                    for (let k=currentContainers[j].children.length-1; k>=0; k--) {
+                        parentNode.removeChild(currentContainers[j].children[k].node)
+                    }
+                    continue
+                }
+                parentNode.removeChild(currentContainers[j].node)
+            }
+            currentContainers.splice(i, currentContainers.length - i)
+            return
         }
 
+        // No more current containers, so append the remaining new containers
         if (newContainers[i]) {
             const fragment = document.createDocumentFragment()
             for ( ; i<newContainers.length; i++) {
-                render(newContainers[i])
-                fragment.appendChild(newContainers[i].node)
+                render(newContainers[i], fragment)
+                currentContainers[i] = newContainers[i]
             }
             parentNode.appendChild(fragment)
             return
         }
 
+        // No more containers
         return
     }
 }
 
 function replaceKeyed(currentContainers, newContainers) {
 
-    const parentNode = currentContainers[0].node.parentNode
+    const parentNode = (currentContainers[0] instanceof Component)
+        ? currentContainers[0].children[0].node.parentNode
+        : currentContainers[0].node.parentNode
 
     // Swaps the current containers
     const swap = (i, index) => {
-        const nextSibling = currentContainers[index].node.nextSibling
-        const currentContainerNode = parentNode.replaceChild(currentContainers[index].node, currentContainers[i].node)
-        parentNode.insertBefore(currentContainerNode, nextSibling)
-        newContainers[i] = currentContainers[index]
-        currentContainers[index] = currentContainers[i]
+        const A = currentContainers[i]
+        const B = currentContainers[index]
+        const nextSibling = (B instanceof Component)
+            ? B.children[B.children.length-1].node.nextSibling
+            : B.node.nextSibling
+
+        if (A instanceof Component) {
+
+            if (B instanceof Component) {
+                const fragment = document.createDocumentFragment()
+                for (let j=0; j<B.children.length; j++) fragment.appendChild(B.children[j].node)
+                parentNode.replaceChild(fragment, A.children[0].node)
+                for (let j=0; j<A.children.length; j++) fragment.appendChild(A.children[j].node)
+                parentNode.insertBefore(fragment, nextSibling)
+            } else {
+                const fragment = document.createDocumentFragment()
+                parentNode.replaceChild(B.node, A.children[0].node)
+                for (let j=0; j<A.children.length; j++) fragment.appendChild(A.children[j].node)
+                parentNode.insertBefore(fragment, nextSibling)
+            }
+        } else if (B instanceof Component) {
+            const fragment = document.createDocumentFragment()
+            for (let j=0; j<B.children.length; j++) fragment.appendChild(B.children[j].node)
+            parentNode.replaceChild(fragment, A.node)
+            parentNode.insertBefore(A.node, nextSibling)
+        } else {
+            parentNode.replaceChild(B.node, A.node)
+            parentNode.insertBefore(A.node, nextSibling)
+        }
+
+        const temp = A
+        currentContainers[i] = currentContainers[index]
+        currentContainers[index] = temp
     }
 
     // Inserts the new container
     const insert = (i) => {
-        render(newContainers[i])
-        parentNode.insertBefore(newContainers[i].node, currentContainers[i].node)
-        currentContainers.unshift(null) // aligns indexes of both arrays
+        if (currentContainers[i] instanceof Component) {
+            if (newContainers[i] instanceof Component) {
+                const fragment = document.createDocumentFragment()
+                render(newContainers[i], fragment)
+                parentNode.insertBefore(fragment, currentContainers[i].children[0].node)
+            } else {
+                render(newContainers[i])
+                parentNode.insertBefore(newContainers[i].node, currentContainers[i].children[0].node)
+            }
+        } else if (newContainers[i] instanceof Component) {
+            const fragment = document.createDocumentFragment()
+            render(newContainers[i], fragment)
+            parentNode.insertBefore(fragment, currentContainers[i].node)
+        } else {
+            render(newContainers[i])
+            parentNode.insertBefore(newContainers[i].node, currentContainers[i].node)
+        }
+        currentContainers.splice(i, 0, newContainers[i])
     }
 
     // Replaces the current container with the new container
     const replaceWithNew = (i) => {
-        if (diff(currentContainers[i], newContainers[i])) return
+        if (diff(currentContainers, newContainers, i)) return
         render(newContainers[i])
         parentNode.replaceChild(newContainers[i].node, currentContainers[i].node)
+        currentContainers[i] = newContainers[i]
     }
 
     // Replaces the current container with the existing new container (actually, with another current container)
     const replaceWithExisting = (i, index) => {
-        parentNode.replaceChild(currentContainers[index].node, currentContainers[i].node)
-        newContainers[i] = currentContainers[index]
+        const A = currentContainers[i]
+        const B = currentContainers[index]
+
+        if (A instanceof Component) {
+
+            if (B instanceof Component) {
+
+                for (let j=0; ; j++) {
+
+                    if (A.children[j]) {
+
+                        if (B.children[j]) {
+                            parentNode.replaceChild(B.children[j].node, A.children[j].node)
+                            continue
+                        }
+
+                        parentNode.removeChild(A.children[j].node)
+                        continue
+                    }
+
+                    if (B.children[j]) {
+                        parentNode.insertBefore(B.children[j].node, B.children[j-1].node.nextSibling)
+                    }
+
+                    break
+                }
+
+            } else {
+                for (let j=A.children.length-1; j>0; j--) {
+                    parentNode.removeChild(A.children[j].node)
+                }
+                parentNode.replaceChild(B.node, A.children[0].node)
+            }
+            
+        } else if (B instanceof Component) {
+            const fragment = document.createDocumentFragment()
+            for (let j=0; j<B.children.length; j++) fragment.appendChild(B.children[j].node)
+            parentNode.replaceChild(fragment, A.node)
+        } else {
+            parentNode.replaceChild(B.node, A.node)
+        }
+        currentContainers[i] = currentContainers[index]
         currentContainers.splice(index, 1)
     }
 
@@ -108,11 +210,8 @@ function replaceKeyed(currentContainers, newContainers) {
                     // Both containers keyed
                     if (newContainers[i].key != null) {
 
-                        // Equal keys, so skip
-                        if (currentContainers[i].key === newContainers[i].key) {
-                            newContainers[i] = currentContainers[i]
-                            continue
-                        }
+                        // Skip equal keys
+                        if (currentContainers[i].key === newContainers[i].key) continue
 
                         // Different keys
                         const indexOfCurrentThatMatchesNew = getIndexOfCurrentThatMatchesNew(i)
@@ -178,7 +277,16 @@ function replaceKeyed(currentContainers, newContainers) {
             }
 
             // No more new containers, so remove the remaining current containers
-            for (let j=currentContainers.length-1; j>=i; j--) parentNode.removeChild(currentContainers[j].node)
+            for (let j=currentContainers.length-1; j>=i; j--) {
+                if (currentContainers[j] instanceof Component) {
+                    for (let k=currentContainers[j].children.length-1; k>=0; k--) {
+                        parentNode.removeChild(currentContainers[j].children[k].node)
+                    }
+                    continue
+                }
+                parentNode.removeChild(currentContainers[j].node)
+            }
+            currentContainers.splice(i, currentContainers.length - i)
             return
         }
 
@@ -186,8 +294,8 @@ function replaceKeyed(currentContainers, newContainers) {
         if (newContainers[i]) {
             const fragment = document.createDocumentFragment()
             for ( ; i<newContainers.length; i++) {
-                render(newContainers[i])
-                fragment.appendChild(newContainers[i].node)
+                render(newContainers[i], fragment)
+                currentContainers[i] = newContainers[i]
             }
             parentNode.appendChild(fragment)
             return
@@ -199,31 +307,72 @@ function replaceKeyed(currentContainers, newContainers) {
 
 }
 
-function diff(currentContainer, newContainer) {
+function diff(currentContainers, newContainers, i) {
 
-    // Skip same containers from props.children of a Component
-    if (currentContainer.node === newContainer.node) return true
+    const currentContainer = currentContainers[i]
+    const newContainer = newContainers[i]
+
+    if (currentContainer instanceof Component) {
+
+        // Both containers are Components
+        if (newContainer instanceof Component) {
+
+            // Update same Component
+            if (currentContainer.origin === newContainer.origin) {
+                currentContainer.update(newContainer.props, newContainer.key)
+                return true
+            }
+
+            // Replace Components children
+            reconcile(currentContainer, newContainer)
+            return true
+        }
+
+        // The current container is a Component and the new container is not
+        const firstChildNode = currentContainer.children[0].node
+        const parentNode = firstChildNode.parentNode
+
+        render(newContainer)
+
+        for (let j=currentContainer.children.length-1; j>0; j--) {
+            parentNode.removeChild(currentContainer.children[j].node)
+        }
+
+        parentNode.replaceChild(newContainer.node, firstChildNode)
+        currentContainers[i] = newContainer
+
+        return true
+    }
+
+    // The new container is a Component and the current container is not
+    if (newContainer instanceof Component) {
+
+        const fragment = document.createDocumentFragment()
+
+        render(newContainer, fragment)
+        currentContainer.node.parentNode.replaceChild(fragment, currentContainer.node)
+        currentContainers[i] = newContainer 
+
+        return true
+    }
 
     // Same type containers
     if (currentContainer.constructor === newContainer.constructor) {
 
         // Skip same Value containers
-        if (currentContainer instanceof Value && currentContainer.value === newContainer.value) {
-            newContainer.node = currentContainer.node
-            return true
+        if (currentContainer instanceof Value) {
+            if (currentContainer.value === newContainer.value) return true
+            return false
         }
 
         // Skip same Inline containers
-        if (currentContainer instanceof Inline && currentContainer.inline === newContainer.inline) {
-            newContainer.node = currentContainer.node
-            return true
+        if (currentContainer instanceof Inline) {
+            if (currentContainer.inline === newContainer.inline) return true
+            return false
         }
 
         // Update same type Elements
         if (currentContainer instanceof Element && currentContainer.type === newContainer.type) {
-
-            // node
-            newContainer.node = currentContainer.node
 
             // attributes
 
@@ -236,19 +385,19 @@ function diff(currentContainer, newContainer) {
                     if (currentContainer.attributes[attr] === newContainer.attributes[attr]) continue
 
                     // update attribute values
-                    newContainer.node.setAttribute(attr, newContainer.attributes[attr])
+                    currentContainer.node.setAttribute(attr, newContainer.attributes[attr])
                     continue
                 }
 
                 // remove the current container attributes not present in the new container
-                newContainer.node.removeAttribute(attr)
+                currentContainer.node.removeAttribute(attr)
 
             }
 
             for (const attr in newContainer.attributes) {
 
                 if (attr === 'value') {
-                    newContainer.node.value = newContainer.attributes[attr]
+                    currentContainer.node.value = newContainer.attributes[attr]
                     continue
                 }
 
@@ -256,39 +405,46 @@ function diff(currentContainer, newContainer) {
                 if (currentContainer.attributes[attr] != null) continue
 
                 // set the new attributes
-                newContainer.node.setAttribute(attr, newContainer.attributes[attr])
+                currentContainer.node.setAttribute(attr, newContainer.attributes[attr])
 
             }
+
+            currentContainer.attributes = newContainer.attributes
 
             // event listeners
 
             for (let eventType in currentContainer.eventListeners) {
-                newContainer.node[eventType] = null
+                currentContainer.node[eventType] = null
             }
 
             for (let eventType in newContainer.eventListeners) {
-                newContainer.node[eventType] = newContainer.eventListeners[eventType]
+                currentContainer.node[eventType] = newContainer.eventListeners[eventType]
             }
 
-            // Replace children or set/update innerHTML
+            currentContainer.eventListeners = newContainer.eventListeners
 
+            // Set/update innerHTML
             if (newContainer.html != null) {
-                newContainer.node.innerHTML = newContainer.html
+                currentContainer.node.innerHTML = newContainer.html
+                currentContainer.html = newContainer.html
+                currentContainer.children = []
                 return true
             }
 
+            // Clear innerHTML and append new children
             if (currentContainer.html != null) {
                 const fragment = document.createDocumentFragment()
-                for (let i=0; i<newContainer.children.length; i++) {
-                        render(newContainer.children[i])
-                        fragment.appendChild(newContainer.children[i].node)
-                }
-                newContainer.node.innerHTML = ''
-                newContainer.node.appendChild(fragment)
+                for (let i=0; i<newContainer.children.length; i++) render(newContainer.children[i], fragment)
+                currentContainer.node.innerHTML = ''
+                currentContainer.node.appendChild(fragment)
+                currentContainer.children = newContainer.children
                 return true
             }
-
+            
+            // Replace children
             reconcile(currentContainer, newContainer)
+            currentContainer.key = newContainer.key
+            currentContainer.childKeys = newContainer.childKeys
             return true
         }
     }

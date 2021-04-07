@@ -1,4 +1,3 @@
-import Component from './types/Component'
 import Inline from './types/Inline'
 import Value from './types/Value'
 
@@ -40,15 +39,12 @@ export default function normalize(data, parentContainer) {
         return data
     }
 
-    // Flatten Components
-    if (data instanceof Component) return data.children
-
-    // Filter Elements that have duplicate keys
+    // Filter containers that have duplicate keys
     if (data.key != null) {
         if (parentContainer.childKeys.indexOf(data.key) !== -1) return []
         parentContainer.childKeys.push(data.key)
     }
 
-    // Return the Element
+    // Return the Element/Component
     return [data]
 }
