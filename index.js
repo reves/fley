@@ -1,15 +1,14 @@
-import render from './container/render'
+import Renderer from './Renderer'
 
-export default function(rootElementId, container) {
+export let renderer = null
+
+export default function(rootElementId, children) {
 
     const rootElement = document.getElementById(rootElementId)
-    const fragment = document.createDocumentFragment()
-
     rootElement.innerHTML = ''
-    render(container, fragment)
-    rootElement.appendChild(fragment)
 
-    window.ley = container.children ?? container // Debug
-    console.log('ley:', window.ley) // Debug
+    renderer = new Renderer(rootElement, children)
+
+    window.upd = () => renderer.dispatchUpdate(window.rootFiber) // debug
 
 }

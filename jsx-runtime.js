@@ -1,12 +1,5 @@
-import Element from './container/types/Element'
-import Component from './container/types/Component'
-import normalize from './container/normalize'
+import Element, { Fragment, Inline } from './Element'
 
-const Fragment = {}
+const jsx = (type, props, key) => (type === Fragment ? props.children : new Element(type, props, key))
 
-function jsx(type, props, key) {
-    if (typeof type === 'string') return new Element(type, props, key)
-    return type === Fragment ? normalize(props.children) : new Component(type, props, key)
-}
-
-export {Fragment, jsx, jsx as jsxs}
+export {Fragment, Inline, jsx, jsx as jsxs }

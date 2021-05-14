@@ -1,85 +1,51 @@
-import { currentComponent } from './container/types/Component'
+import { currentFiber } from './Renderer'
+import { renderer } from './index'
 
 export const statesWatchers = new WeakMap()
-
-window.states = statesWatchers // Debug
+window.states = statesWatchers // debug
 
 export default function State(initial) {
 
-    // Local state
-    if (currentComponent) {
-
-        const previousComponent = currentComponent.previousComponent
-
-        // Use the previous state, when updating the Component
-        if (previousComponent) {
-            
-            const state = previousComponent.states.length ? previousComponent.states.shift() : initial
-            const index = currentComponent.states.push(state) - 1
-
-            const setState = data => {
-                const states = previousComponent.states
-                states[index] = typeof data === 'function' ? data(states[index]) : data
-                previousComponent.update()
-            }
-
-            return [state, setState]
-        }
-
-        const actualComponent = currentComponent // preserve the reference
-        const state = initial
-        const index = actualComponent.states.push(state) - 1
+    // Local
+    if (currentFiber) {
+        const fiber = currentFiber
+        const index = fiber.stateIndex++
+        const state = fiber.states.hasOwnProperty(index) ? fiber.states[index] : initial
+        fiber.states[index] = state
 
         const setState = data => {
-            const states = actualComponent.states
-            states[index] = typeof data === 'function' ? data(states[index]) : data
-            actualComponent.update()
+            fiber.states[index] = typeof data === 'function' ? data(fiber.states[index]) : data
+            renderer.dispatchUpdate(fiber)
         }
 
         return [state, setState]
     }
 
-    // Create a global state
-    const state = typeof initial === 'object' ? initial : Object.create(initial)
+    // Global
     const watchers = []
 
-    const setState = (data) => {
-        Object.assign(state, (typeof data === 'function' ? data(state) : data))
-        const indexes = []
-        watchers.forEach(component => {
-            if (!document.body.contains(component.children[0].node)) { // TODO: Redo this temporary solution
-                indexes.push(watchers.indexOf(component))
-                return
-            }
-            component.update()
-        })
-        indexes.forEach(i => watchers.splice(i, 1))
+    const setState = data => {
+        Object.assign(initial, (typeof data === 'function' ? data(initial) : data))
+        watchers.forEach(fiber => renderer.dispatchUpdate(fiber))
     }
 
-    statesWatchers.set(state, watchers)
+    statesWatchers.set(initial, watchers)
 
-    return [state, setState]
+    return [initial, setState]
 }
 
-export function watch(state) {
+export function watch(globalState) {
 
-    const previousComponent = currentComponent.previousComponent
-    const watchers = statesWatchers.get(state)
+    if (!currentFiber) return
+    if (currentFiber.watching.indexOf(globalState) !== -1) return
 
-    if (!previousComponent) {
-        watchers.push(currentComponent)
-        currentComponent.watching.push(state)
-        return
+    const watchers = statesWatchers.get(globalState)
+
+    if (currentFiber.alternate) {
+        const index = watchers.indexOf(currentFiber.alternate)
+        if (index !== -1) watchers.splice(index, 1)
     }
 
-    if (watchers.indexOf(previousComponent) !== -1) return
-
-    watchers.push(previousComponent)
-    currentComponent.watching.push(state)
-
-}
-
-export function unwatch() {
-    // TODO
-    // ...
+    currentFiber.watching.push(globalState)
+    watchers.push(currentFiber)
 }
