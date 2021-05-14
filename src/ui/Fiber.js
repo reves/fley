@@ -1,11 +1,10 @@
-import { Root } from './Element'
-import { statesWatchers } from './State'
+import { statesWatchers } from '../State'
 
 export const tag = {
     UPDATE: 'UPDATE',
     INSERT: 'INSERT',
     MOVE:   'MOVE',
-    SAVE:   'SAVE', // just fiber.tag = null ?
+    SAVE:   'SAVE', // just fiber.tag == null ?
 }
 
 export default class Fiber
@@ -21,14 +20,9 @@ export default class Fiber
         this.child = null
         this.parent = null
         this.sibling = null
-
-        this.update = null
         this.states = []
         this.stateIndex = 0
-
         this.watching = []
-
-        this.cloned = null
 
         // Reconcile
         this.skip = false
@@ -48,7 +42,6 @@ export default class Fiber
         fiber.props = pendingProps || this.props
         fiber.key = this.key
         fiber.parent = parent || this.parent
-
         fiber.states = this.states
         fiber.watching = this.watching
 
@@ -73,7 +66,6 @@ export default class Fiber
         fiber.key = this.key
         fiber.parent = parent
         fiber.child = this.child.clone(fiber)
-
         fiber.states = this.states
         fiber.watching = this.watching
 
@@ -83,6 +75,7 @@ export default class Fiber
             watchers[index] = fiber
         })
 
+        // Subtree
         let alternate = this.child
         let current = fiber.child
 
@@ -120,15 +113,6 @@ export default class Fiber
 
         }
 
-        return fiber
-    }
-
-    static createHostRoot(rootNode, children)
-    {
-        const fiber = new Fiber
-        fiber.type = Root
-        fiber.node = rootNode
-        fiber.props = { children }
         return fiber
     }
 

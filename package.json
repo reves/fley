@@ -3,11 +3,15 @@
     "version": "1.0.0",
     "description": "Frontend JavaScript web framework based on JSX syntax",
     "keywords": [
-        "ley"
+        "ley", "frontend", "framework", "jsx", "ui-library"
     ],
+    "browser": "./src/ley.js",
+    "exports": {
+        ".": "./src/ley.js",
+        "./": "./src/"
+    },
     "homepage": "https://github.com/reves/ley",
     "bugs": "https://github.com/reves/ley/issues",
     "license": "MIT",
-    "browser": "./index.js",
     "repository": "github:reves/ley"
 }

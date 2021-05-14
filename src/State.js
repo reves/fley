@@ -1,5 +1,4 @@
-import { currentFiber } from './Renderer'
-import { renderer } from './index'
+import { currentFiber, dispatchUpdate } from './ui/renderer'
 
 export const statesWatchers = new WeakMap()
 window.states = statesWatchers // debug
@@ -15,7 +14,7 @@ export default function State(initial) {
 
         const setState = data => {
             fiber.states[index] = typeof data === 'function' ? data(fiber.states[index]) : data
-            renderer.dispatchUpdate(fiber)
+            dispatchUpdate(fiber)
         }
 
         return [state, setState]
@@ -26,7 +25,7 @@ export default function State(initial) {
 
     const setState = data => {
         Object.assign(initial, (typeof data === 'function' ? data(initial) : data))
-        watchers.forEach(fiber => renderer.dispatchUpdate(fiber))
+        watchers.forEach(fiber => dispatchUpdate(fiber))
     }
 
     statesWatchers.set(initial, watchers)

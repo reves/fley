@@ -1,4 +1,3 @@
-export const Root = 'ROOT'
 export const Fragment = 'FRAGMENT'
 export const Inline = 'INLINE'
 export const Text = 'TEXT'

@@ -1,4 +1,4 @@
-import Element, { Fragment, Inline } from './Element'
+import Element, { Fragment, Inline } from './ui/Element'
 
 const jsx = (type, props, key) => (type === Fragment ? props.children : new Element(type, props, key))
 
