@@ -1,4 +1,5 @@
 import { statesWatchers } from '../State'
+import { queue } from './renderer'
 
 export const tag = {
     UPDATE: 'UPDATE',
@@ -23,6 +24,7 @@ export default class Fiber
         this.states = []
         this.stateIndex = 0
         this.watching = []
+        this.inQueue = false
 
         // Reconcile
         this.skip = false
@@ -34,6 +36,7 @@ export default class Fiber
 
     clone(parent, pendingProps)
     {
+        this.alternate = null
         const fiber = new Fiber
         fiber.alternate = this
         fiber.isComponent = this.isComponent
@@ -45,37 +48,33 @@ export default class Fiber
         fiber.states = this.states
         fiber.watching = this.watching
 
-        this.watching.forEach(globalState => {
+        fiber.watching.forEach(globalState => {
             const watchers = statesWatchers.get(globalState)
             const index = watchers.indexOf(this)
+            if (index === -1) {
+                console.log('-1 !!! ', fiber.type.name) // debug
+                return
+            }
             watchers[index] = fiber
         })
+
+        if (this.inQueue) {
+            // console.log('inQUeue') // debug
+            const index = queue.indexOf(this)
+            if (index !== -1) queue[queue.indexOf(this)] = fiber
+        }
 
         return fiber
     }
 
     cloneTree(parent)
     {
-        const fiber = new Fiber
+        const fiber = this.clone(parent)
+
         fiber.skipReconcile = true
-        fiber.alternate = this
-        fiber.isComponent = this.isComponent
-        fiber.node = this.node
-        fiber.type = this.type
-        fiber.props = this.props
-        fiber.key = this.key
-        fiber.parent = parent
         fiber.child = this.child.clone(fiber)
-        fiber.states = this.states
-        fiber.watching = this.watching
 
-        this.watching.forEach(globalState => {
-            const watchers = statesWatchers.get(globalState)
-            const index = watchers.indexOf(this)
-            watchers[index] = fiber
-        })
-
-        // Subtree
+        // Clone subtree
         let alternate = this.child
         let current = fiber.child
 

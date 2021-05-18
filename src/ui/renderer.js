@@ -8,16 +8,85 @@ let WIP = null
 let next = null
 let idleCallbackId = null
 let deletes = []
+export let queue = []
+window.queue = queue // debug
+
+function replaceBackStateWatchers(fiber) {
+
+    let theFiber = fiber
+
+    while (theFiber) {
+
+        if (theFiber.isComponent && theFiber.watching.length) {
+            
+            theFiber.watching.forEach(globalState => {
+                const watchers = statesWatchers.get(globalState)
+                const index = watchers.indexOf(theFiber)
+                if (index === -1) return
+                watchers[index] = theFiber.alternate
+            })
+
+        }
+
+        if (theFiber.child) {
+            theFiber = theFiber.child
+            continue
+        }
+
+        if (theFiber.sibling) {
+            theFiber = theFiber.sibling
+            continue
+        }
+
+        while (theFiber.parent && !theFiber.parent.sibling) {
+            theFiber = theFiber.parent
+            if (theFiber === fiber) break
+        }
+
+        if (theFiber === fiber || !theFiber.parent || theFiber.parent === fiber) break
+
+        theFiber = theFiber.parent.sibling
+    }
+}
 
 export function dispatchUpdate(fiber) {
 
-    if (!WIP) WIP = fiber.clone()
-    else if (idleCallbackId != null) cancelIdleCallback(idleCallbackId)
+    // Work already in progress
+    if (WIP) {
 
-    deletes = []
+        // console.log('Work already in progress')
+
+        // Same fiber, so clear the current work progress and start again
+        if (WIP === fiber) {
+
+            // TODO: set timeout and render once a while, so the user can see the progress
+
+            // Replace back state watchers
+            replaceBackStateWatchers(WIP)
+
+            WIP = WIP.alternate.clone()
+            next = WIP
+            deletes = []
+
+            // Re-schedule rendering
+            cancelIdleCallback(idleCallbackId)
+            idleCallbackId = requestIdleCallback(render, {timeout: 1000/60})
+            return
+        }
+
+        // Other fiber, so let the current work to be done and queue the other fiber
+        if (queue.indexOf(fiber) !== -1) return
+
+        queue.push(fiber)
+        fiber.inQueue = true
+        return
+    }
+
+    // Start work
+    WIP = fiber.clone()
     next = WIP
 
-    // Start rendering
+    // Schedule rendering
     idleCallbackId = requestIdleCallback(render)
 }
 
@@ -32,7 +101,7 @@ function render(deadline) {
         pause = deadline.timeRemaining() < 1
     }
 
-    // Reconcilation paused, continue later
+    // Reconcilation paused, schedule next step
     if (next) {
         idleCallbackId = requestIdleCallback(render)
         return
@@ -40,8 +109,6 @@ function render(deadline) {
 
     // Reconcilation complete, apply changes
     commit()
-    WIP = null
-    deletes = []
 }
 
 function reconcile(fiber) {
@@ -330,35 +397,28 @@ function getElementByKey(elements, startIndex, key) {
 function commit() {
 
     // Replace the updated fiber in the tree
-    let fiber = WIP.alternate
+    let alternate = WIP.alternate
 
-    if (fiber.parent) {
-        
-        const parent = fiber.parent
-        
-        if (parent.child === fiber) {
+    if (alternate.parent) {
 
-            parent.child = WIP
+        // First sibling
+        if (alternate.parent.child === alternate) { 
+            
+            alternate.parent.child = WIP
 
-        } else {
-
-            let sibling = parent.child
-
-            while (sibling) {
-                if (sibling.nextSibling === fiber) {
-                    sibling.nextSibling = WIP
-                    break
-                }
-                sibling = sibling.nextSibling
-            }
+        // Further sibling
+        } else { 
+            let child = alternate.parent.child
+            while (child.sibling !== alternate) child = child.sibling
+            child.sibling = WIP
 
         }
-        
-        WIP.nextSibling = fiber.nextSibling
+
+        WIP.sibling = alternate.sibling
     }
 
     // Update DOM
-    fiber = WIP
+    let fiber = WIP
 
     while (fiber) {
 
@@ -490,8 +550,8 @@ function commit() {
 
         const fiber = deletes[i]
 
-        // remove state watchers
-        const theFiber = fiber
+        // Remove state watchers
+        let theFiber = fiber
 
         while (theFiber) {
 
@@ -503,6 +563,8 @@ function commit() {
                     const index = watchers.indexOf(theFiber)
                     watchers.splice(index, 1)
                 })
+
+                // theFiber.watching = []
 
             }
 
@@ -533,6 +595,15 @@ function commit() {
         }
 
         getClosestChildrenWithNodes(fiber).forEach(f => f.node.parentNode.removeChild(f.node))
+    }
+
+    WIP = null
+    deletes = []
+
+    const fromQueue = queue.shift()
+    if (fromQueue) {
+        dispatchUpdate(fromQueue)
+        fromQueue.inQueue = false
     }
 }
 

@@ -40,10 +40,10 @@ export function watch(globalState) {
 
     const watchers = statesWatchers.get(globalState)
 
-    if (currentFiber.alternate) {
+    /* if (currentFiber.alternate) {
         const index = watchers.indexOf(currentFiber.alternate)
         if (index !== -1) watchers.splice(index, 1)
-    }
+    } */
 
     currentFiber.watching.push(globalState)
     watchers.push(currentFiber)
