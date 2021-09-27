@@ -54,9 +54,9 @@ export function dispatchUpdate(fiber) {
     // Work already in progress
     if (WIP) {
 
-        // console.log('Work already in progress')
+        // console.log('Work already in progress') // debug
 
-        // Same fiber, so clear the current work progress and start again
+        // Same fiber, so revert the changes of the current work progress and start again
         if (WIP === fiber) {
 
             // TODO: set timeout and render once a while, so the user can see the progress

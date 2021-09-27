@@ -13,3 +13,5 @@ export default function ley(rootElementId, children) {
 
     dispatchUpdate(rootFiber)
 }
+
+export {Fragment , Inline} from './ui/Element'
