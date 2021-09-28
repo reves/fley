@@ -166,6 +166,12 @@ function updateHostElement(fiber) {
             // Reserved prop
             if (prop === 'children') continue
 
+            // On update (mount also) event listener
+            if (/onupdate/i.test(prop)) {
+                fiber.onUpdate = props[prop]
+                continue
+            }
+
             // Event listeners
             if (/^on.+/i.test(prop)) {
                 node[prop.toLowerCase()] = props[prop]
@@ -418,6 +424,7 @@ function commit() {
     }
 
     // Update DOM
+    let onUpdateQueue = []
     let fiber = WIP
 
     while (fiber) {
@@ -426,7 +433,7 @@ function commit() {
             switch (fiber.tag) {
                 case tag.INSERT:
                 case tag.MOVE:
-
+                    
                     if (fiber.mounted) break
 
                     if (fiber.relFiber && fiber.relFiber.isComponent) {
@@ -437,6 +444,7 @@ function commit() {
                     const relFiber = fiber.relFiber
 
                     if (!fiber.isComponent) {
+                        if (fiber.onUpdate != null) onUpdateQueue.push(fiber)
                         parentNode.insertBefore(fiber.node, relFiber ? relFiber.node.nextSibling : null)
                         break
                     }
@@ -448,6 +456,7 @@ function commit() {
                         if (f.mounted) return
                         fragment.appendChild(f.node)
                         f.mounted = true
+                        if (f.onUpdate != null) onUpdateQueue.push(f)
                     })
 
                     parentNode.insertBefore(fragment, relFiber ? relFiber.node.nextSibling : null)
@@ -463,6 +472,8 @@ function commit() {
                         } else if (fiber.type === Inline) {}
                         else {
                             
+                            if (fiber.onUpdate != null) onUpdateQueue.push(fiber)
+
                             const node = fiber.node
 
                             // Remove old
@@ -533,6 +544,15 @@ function commit() {
         if (fiber.sibling) {
             fiber = fiber.sibling
             continue
+        }
+
+        // Layout effect
+        if (onUpdateQueue.length) {
+            for (let i=onUpdateQueue.length-1; i>-1; i--) {
+                let fiber = onUpdateQueue[i];
+                fiber.onUpdate(fiber.node)
+            }
+            onUpdateQueue = []
         }
 
         while (fiber.parent && !fiber.parent.sibling) {

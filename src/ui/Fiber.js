@@ -25,6 +25,7 @@ export default class Fiber
         this.stateIndex = 0
         this.watching = []
         this.inQueue = false
+        this.onUpdate = null
 
         // Reconcile
         this.skip = false
@@ -47,6 +48,7 @@ export default class Fiber
         fiber.parent = parent || this.parent
         fiber.states = this.states
         fiber.watching = this.watching
+        fiber.onUpdate = this.onUpdate
 
         fiber.watching.forEach(globalState => {
             const watchers = statesWatchers.get(globalState)
