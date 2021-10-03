@@ -167,8 +167,14 @@ function updateHostElement(fiber) {
             if (prop === 'children') continue
 
             // On update (mount also) event listener
-            if (/onupdate/i.test(prop)) {
+            if (/^onupdate$/i.test(prop)) {
                 fiber.onUpdate = props[prop]
+                continue
+            }
+
+            // Ref
+            if (/^ref$/i.test(prop)) {
+                props[prop].current = node
                 continue
             }
 
@@ -415,8 +421,8 @@ function commit() {
         // Further sibling
         } else { 
             let child = alternate.parent.child
-            while (child.sibling !== alternate) child = child.sibling
-            child.sibling = WIP
+            while (child && child.sibling !== alternate) child = child.sibling
+            if (child) child.sibling = WIP
 
         }
 
@@ -546,15 +552,6 @@ function commit() {
             continue
         }
 
-        // Layout effect
-        if (onUpdateQueue.length) {
-            for (let i=onUpdateQueue.length-1; i>-1; i--) {
-                let fiber = onUpdateQueue[i];
-                fiber.onUpdate(fiber.node)
-            }
-            onUpdateQueue = []
-        }
-
         while (fiber.parent && !fiber.parent.sibling) {
             fiber = fiber.parent
             if (fiber === WIP) break
@@ -624,6 +621,15 @@ function commit() {
     if (fromQueue) {
         dispatchUpdate(fromQueue)
         fromQueue.inQueue = false
+    }
+
+    // Layout effect
+    if (onUpdateQueue.length) {
+        for (let i=onUpdateQueue.length-1; i>-1; i--) {
+            let fiber = onUpdateQueue[i];
+            fiber.onUpdate(fiber.node)
+        }
+        onUpdateQueue = []
     }
 }
 

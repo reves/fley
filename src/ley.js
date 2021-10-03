@@ -14,4 +14,8 @@ export default function ley(rootElementId, children) {
     dispatchUpdate(rootFiber)
 }
 
+export function useRef(initial) {
+    return { current: initial || null }
+}
+
 export { Fragment, Inline } from './ui/Element'

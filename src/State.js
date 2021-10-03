@@ -37,14 +37,7 @@ export function watch(globalState) {
 
     if (!currentFiber) return
     if (currentFiber.watching.indexOf(globalState) !== -1) return
-
-    const watchers = statesWatchers.get(globalState)
-
-    /* if (currentFiber.alternate) {
-        const index = watchers.indexOf(currentFiber.alternate)
-        if (index !== -1) watchers.splice(index, 1)
-    } */
-
+    
     currentFiber.watching.push(globalState)
-    watchers.push(currentFiber)
+    statesWatchers.get(globalState).push(currentFiber)
 }
