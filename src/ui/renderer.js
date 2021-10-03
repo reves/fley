@@ -1,6 +1,7 @@
 import Fiber, { tag } from './Fiber'
 import Element, { Text, Fragment, Inline, normalize } from './Element'
 import { statesWatchers } from '../State'
+import is from '../utils/is'
 
 export let currentFiber = null
 
@@ -166,14 +167,8 @@ function updateHostElement(fiber) {
             // Reserved prop
             if (prop === 'children') continue
 
-            // On update (mount also) event listener
-            if (/^onupdate$/i.test(prop)) {
-                fiber.onUpdate = props[prop]
-                continue
-            }
-
             // Ref
-            if (/^ref$/i.test(prop)) {
+            if (prop === 'ref') {
                 props[prop].current = node
                 continue
             }
@@ -433,6 +428,8 @@ function commit() {
     let onUpdateQueue = []
     let fiber = WIP
 
+    if (fiber.effects.length) onUpdateQueue.push(fiber)
+
     while (fiber) {
 
         if (fiber.type !== Fragment) {
@@ -450,10 +447,11 @@ function commit() {
                     const relFiber = fiber.relFiber
 
                     if (!fiber.isComponent) {
-                        if (fiber.onUpdate != null) onUpdateQueue.push(fiber)
                         parentNode.insertBefore(fiber.node, relFiber ? relFiber.node.nextSibling : null)
                         break
                     }
+
+                    if (fiber.effects.length) onUpdateQueue.push(fiber)
 
                     const fragment = document.createDocumentFragment()
                     const fibersWithNodes = getClosestChildrenWithNodes(fiber)
@@ -462,7 +460,6 @@ function commit() {
                         if (f.mounted) return
                         fragment.appendChild(f.node)
                         f.mounted = true
-                        if (f.onUpdate != null) onUpdateQueue.push(f)
                     })
 
                     parentNode.insertBefore(fragment, relFiber ? relFiber.node.nextSibling : null)
@@ -477,8 +474,6 @@ function commit() {
                             if (fiber.props.value !== fiber.alternate.props.value && fiber.node.nodeValue !== fiber.props.value+'') fiber.node.nodeValue = fiber.props.value
                         } else if (fiber.type === Inline) {}
                         else {
-                            
-                            if (fiber.onUpdate != null) onUpdateQueue.push(fiber)
 
                             const node = fiber.node
 
@@ -488,7 +483,7 @@ function commit() {
                             for (const prop in props) {
 
                                 // Reserved prop
-                                if (prop === 'children') continue
+                                if (prop === 'children' || prop === 'ref') continue
 
                                 // Event listeners
                                 if (/^on.+/i.test(prop)) {
@@ -507,6 +502,12 @@ function commit() {
 
                                 // Reserved prop
                                 if (prop === 'children') continue
+
+                                // Ref
+                                if (prop === 'ref') {
+                                    props[prop].current = node
+                                    continue
+                                }
 
                                 // Event listeners
                                 if (/^on.+/i.test(prop)) {
@@ -562,26 +563,40 @@ function commit() {
         fiber = fiber.parent.sibling
     }
 
+    if (alternate.effectsCleanups.length) {
+        alternate.effectsCleanups.forEach(cleanup => {
+            if (cleanup) cleanup()
+        })
+    }
+
     // Deletes
     for (let i=0; i<deletes.length; i++) {
 
         const fiber = deletes[i]
 
-        // Remove state watchers
+        // Remove state watchers && run cleanups
         let theFiber = fiber
 
         while (theFiber) {
 
-            if (theFiber.isComponent && theFiber.watching.length) {
+            if (theFiber.isComponent) {
                 
-                theFiber.watching.forEach(globalState => {
-                    const watchers = statesWatchers.get(globalState)
+                if (theFiber.watching.length) {
+                        theFiber.watching.forEach(globalState => {
+                            const watchers = statesWatchers.get(globalState)
 
-                    const index = watchers.indexOf(theFiber)
-                    watchers.splice(index, 1)
-                })
+                            const index = watchers.indexOf(theFiber)
+                            watchers.splice(index, 1)
+                        })
 
-                // theFiber.watching = []
+                        // theFiber.watching = []
+                }
+
+                if (theFiber.effectsCleanups.length) {
+                    theFiber.effectsCleanups.forEach(cleanup => {
+                        if (cleanup) cleanup()
+                    })
+                }
 
             }
 
@@ -607,7 +622,7 @@ function commit() {
 
         // Remove nodes
         if (!fiber.isComponent) {
-            fiber.node.parentNode.removeChild(fiber.node)
+            if (fiber.node.parentNode) fiber.node.parentNode.removeChild(fiber.node)
             continue
         }
 
@@ -623,11 +638,28 @@ function commit() {
         fromQueue.inQueue = false
     }
 
-    // Layout effect
+    // Effect
     if (onUpdateQueue.length) {
         for (let i=onUpdateQueue.length-1; i>-1; i--) {
             let fiber = onUpdateQueue[i];
-            fiber.onUpdate(fiber.node)
+            fiber.effects.forEach((effect, index) => {
+                if (!effect) return;
+                if (!fiber.alternate || fiber.effectsDependencies[index] === null) return fiber.effectsCleanups[index] = effect()
+                if (!fiber.effectsDependencies[index].length) return
+
+                const prevDeps = fiber.alternate.effectsDependencies[index]
+                const currDeps = fiber.effectsDependencies[index]
+                let changed = false
+
+                for (let j=0; j<currDeps.length; j++) {
+                    if (!is(prevDeps[j], currDeps[j])) {
+                        changed = true
+                        break
+                    }
+                }
+
+                if (changed) return fiber.effectsCleanups[index] = effect()
+            })
         }
         onUpdateQueue = []
     }

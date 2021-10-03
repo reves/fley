@@ -22,10 +22,13 @@ export default class Fiber
         this.parent = null
         this.sibling = null
         this.states = []
-        this.stateIndex = 0
+        this.hookIndex = 0
         this.watching = []
         this.inQueue = false
         this.onUpdate = null
+        this.effects = []
+        this.effectsDependencies = []
+        this.effectsCleanups = []
 
         // Reconcile
         this.skip = false
@@ -49,6 +52,7 @@ export default class Fiber
         fiber.states = this.states
         fiber.watching = this.watching
         fiber.onUpdate = this.onUpdate
+        fiber.effects = this.effects
 
         fiber.watching.forEach(globalState => {
             const watchers = statesWatchers.get(globalState)

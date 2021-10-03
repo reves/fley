@@ -1,6 +1,6 @@
 import Fiber from './ui/Fiber'
 import { normalize } from './ui/Element'
-import { dispatchUpdate } from './ui/renderer'
+import { currentFiber, dispatchUpdate } from './ui/renderer'
 
 export default function ley(rootElementId, children) {
 
@@ -14,8 +14,18 @@ export default function ley(rootElementId, children) {
     dispatchUpdate(rootFiber)
 }
 
-export function useRef(initial) {
-    return { current: initial || null }
+export function useRef(initial = null) {
+    return { current: initial }
+}
+
+export function useEffect(effect, dependencies = null) {
+
+    if (!currentFiber) return
+
+    const index = currentFiber.hookIndex++
+
+    currentFiber.effects[index] = effect
+    currentFiber.effectsDependencies[index] = dependencies
 }
 
 export { Fragment, Inline } from './ui/Element'

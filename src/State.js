@@ -8,7 +8,7 @@ export default function State(initial) {
     // Local
     if (currentFiber) {
         const fiber = currentFiber
-        const index = fiber.stateIndex++
+        const index = fiber.hookIndex++
         const state = fiber.states.hasOwnProperty(index) ? fiber.states[index] : initial
         fiber.states[index] = state
 
