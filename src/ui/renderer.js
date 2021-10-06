@@ -55,10 +55,8 @@ export function dispatchUpdate(fiber) {
     // Work already in progress
     if (WIP) {
 
-        // console.log('Work already in progress') // debug
-
         // Same fiber, so revert the changes of the current work progress and start again
-        if (WIP === fiber) {
+        if (WIP.alternate === fiber) {
 
             // TODO: set timeout and render once a while, so the user can see the progress
 
@@ -201,7 +199,7 @@ function updateHostElement(fiber) {
         }
     }
 
-    if (fiber.props.children) reconcileChildren(fiber, fiber.props.children)
+    reconcileChildren(fiber, fiber.props.children)
 }
 
 function updateHostText(fiber) {
@@ -213,6 +211,47 @@ function updateHostInline(fiber) {
         const temp = document.createElement('div')
         temp.innerHTML = fiber.props.html || ''
         fiber.node = temp.childNodes[0] || document.createTextNode('');
+
+        const props = fiber.props
+        const node = fiber.node
+
+        for (const prop in props) {
+
+            // Reserved prop
+            if (prop === 'children') continue
+
+            // Ref
+            if (prop === 'ref') {
+                props[prop].current = node
+                continue
+            }
+
+            // Event listeners
+            if (/^on.+/i.test(prop)) {
+                node[prop.toLowerCase()] = props[prop]
+                continue
+            }
+
+            // Attributes
+            switch (typeof props[prop]) {
+                case 'function':
+                    props[prop] = props[prop]()
+                    if (typeof props[prop] === 'boolean') {
+                        if (props[prop]) node.setAttribute(prop, '')
+                        continue
+                    }
+                    if (props[prop] != null) node.setAttribute(prop, props[prop])
+                    continue
+
+                case 'boolean':
+                    if (props[prop]) node.setAttribute(prop, '')
+                    continue
+
+                default:
+                    if (props[prop] != null) node.setAttribute(prop, props[prop])
+                    continue
+            }
+        }
     }
 }
 
@@ -436,7 +475,7 @@ function commit() {
             switch (fiber.tag) {
                 case tag.INSERT:
                 case tag.MOVE:
-                    
+
                     if (fiber.mounted) break
 
                     if (fiber.relFiber && fiber.relFiber.isComponent) {
@@ -633,6 +672,7 @@ function commit() {
     deletes = []
 
     const fromQueue = queue.shift()
+
     if (fromQueue) {
         dispatchUpdate(fromQueue)
         fromQueue.inQueue = false
