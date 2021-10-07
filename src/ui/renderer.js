@@ -55,8 +55,9 @@ export function dispatchUpdate(fiber) {
     // Work already in progress
     if (WIP) {
 
+        // TODO: Rewrite (not working properly atm)
         // Same fiber, so revert the changes of the current work progress and start again
-        if (WIP.alternate === fiber) {
+        /* if (WIP.alternate === fiber) {
 
             // TODO: set timeout and render once a while, so the user can see the progress
 
@@ -71,7 +72,7 @@ export function dispatchUpdate(fiber) {
             cancelIdleCallback(idleCallbackId)
             idleCallbackId = requestIdleCallback(render, {timeout: 1000/60})
             return
-        }
+        } */
 
         // Other fiber, so let the current work to be done and queue the other fiber
         if (queue.indexOf(fiber) !== -1) return
