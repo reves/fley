@@ -18,6 +18,7 @@ export default class Fiber
         this.props = null
         this.key = null
         this.alternate = null
+        this.next = null
         this.child = null
         this.parent = null
         this.sibling = null
@@ -40,8 +41,9 @@ export default class Fiber
 
     clone(parent, pendingProps)
     {
-        this.alternate = null
         const fiber = new Fiber
+        this.alternate = null
+        this.next = fiber
         fiber.alternate = this
         fiber.isComponent = this.isComponent
         fiber.node = this.node

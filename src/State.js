@@ -7,13 +7,14 @@ export default function State(initial) {
 
     // Local
     if (currentFiber) {
-        const fiber = currentFiber
+        let fiber = currentFiber
         const index = fiber.hookIndex++
         const state = fiber.states.hasOwnProperty(index) ? fiber.states[index] : initial
         fiber.states[index] = state
 
         const setState = data => {
-            fiber.states[index] = typeof data === 'function' ? data(fiber.states[index]) : data
+            while (fiber.next) fiber = fiber.next
+            fiber.states[index] = typeof data === 'function' ? data(fiber.states[index]) : data            
             dispatchUpdate(fiber)
         }
 
