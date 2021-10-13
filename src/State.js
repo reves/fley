@@ -34,11 +34,13 @@ export default function State(initial) {
     return [initial, setState]
 }
 
-export function watch(globalState) {
+export function watch(globalState, ...globalStates) {
 
     if (!currentFiber) return
     if (currentFiber.watching.indexOf(globalState) !== -1) return
     
     currentFiber.watching.push(globalState)
     statesWatchers.get(globalState).push(currentFiber)
+
+    globalStates.forEach(state => watch(state))
 }
