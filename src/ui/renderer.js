@@ -10,7 +10,6 @@ let next = null
 let idleCallbackId = null
 let deletes = []
 export let queue = []
-window.queue = queue // debug
 
 function replaceBackStateWatchers(fiber) {
 
@@ -74,7 +73,7 @@ export function dispatchUpdate(fiber) {
             return
         } */
 
-        // Other fiber, so let the current work to be done and queue the other fiber
+        // Different fiber, so let the current work to be done and queue this one
         if (queue.indexOf(fiber) !== -1) return
 
         queue.push(fiber)
@@ -172,31 +171,16 @@ function updateHostElement(fiber) {
                 continue
             }
 
-            // Event listeners
+            // Set event listener
             if (/^on.+/i.test(prop)) {
                 node[prop.toLowerCase()] = props[prop]
                 continue
             }
 
-            // Attributes
-            switch (typeof props[prop]) {
-                case 'function':
-                    props[prop] = props[prop]()
-                    if (typeof props[prop] === 'boolean') {
-                        if (props[prop]) node.setAttribute(prop, '')
-                        continue
-                    }
-                    if (props[prop] != null) node.setAttribute(prop, props[prop])
-                    continue
-
-                case 'boolean':
-                    if (props[prop]) node.setAttribute(prop, '')
-                    continue
-
-                default:
-                    if (props[prop] != null) node.setAttribute(prop, props[prop])
-                    continue
-            }
+            // Set attribute
+            if (typeof props[prop] === 'boolean' && props[prop]) node.setAttribute(prop, '')
+            else if (props[prop] != null) node.setAttribute(prop, props[prop])
+            
         }
     }
 
@@ -221,37 +205,22 @@ function updateHostInline(fiber) {
             // Reserved prop
             if (prop === 'children') continue
 
-            // Ref
+            // Set Ref
             if (prop === 'ref') {
                 props[prop].current = node
                 continue
             }
 
-            // Event listeners
+            // Set event listener
             if (/^on.+/i.test(prop)) {
                 node[prop.toLowerCase()] = props[prop]
                 continue
             }
 
-            // Attributes
-            switch (typeof props[prop]) {
-                case 'function':
-                    props[prop] = props[prop]()
-                    if (typeof props[prop] === 'boolean') {
-                        if (props[prop]) node.setAttribute(prop, '')
-                        continue
-                    }
-                    if (props[prop] != null) node.setAttribute(prop, props[prop])
-                    continue
+            // Set attribute
+            if (typeof props[prop] === 'boolean' && props[prop]) node.setAttribute(prop, '')
+            else if (props[prop] != null) node.setAttribute(prop, props[prop])
 
-                case 'boolean':
-                    if (props[prop]) node.setAttribute(prop, '')
-                    continue
-
-                default:
-                    if (props[prop] != null) node.setAttribute(prop, props[prop])
-                    continue
-            }
         }
     }
 }
@@ -512,69 +481,65 @@ function commit() {
                         
                         if (fiber.type === Text) {
                             if (fiber.props.value !== fiber.alternate.props.value && fiber.node.nodeValue !== fiber.props.value+'') fiber.node.nodeValue = fiber.props.value
-                        } else if (fiber.type === Inline) {}
-                        else {
+                        } else {
 
                             const node = fiber.node
+                            const propsPrev = fiber.alternate.props
+                            const propsCurr = fiber.props
 
-                            // Remove old
-                            let props = fiber.alternate.props
-
-                            for (const prop in props) {
+                            // Previous props
+                            for (const prop in propsPrev) {
 
                                 // Reserved prop
-                                if (prop === 'children' || prop === 'ref') continue
+                                if (prop === 'children') continue
 
-                                // Event listeners
+                                // Unset Ref
+                                if (prop === 'ref') {
+                                    propsPrev[prop].current = null
+                                    continue
+                                }
+
+                                // Unset event listener
                                 if (/^on.+/i.test(prop)) {
                                     node[prop.toLowerCase()] = null
                                     continue
                                 }
 
-                                // Attributes
+                                // Skip same attributes, to compare values later
+                                if (propsCurr[prop] !== undefined) continue
+
+                                // Remove attribute
                                 node.removeAttribute(prop)
                             }
 
-                            // Set new
-                            props = fiber.props
-
-                            for (const prop in props) {
+                            // Current props
+                            for (const prop in propsCurr) {
 
                                 // Reserved prop
                                 if (prop === 'children') continue
 
-                                // Ref
+                                // Set Ref
                                 if (prop === 'ref') {
-                                    props[prop].current = node
+                                    propsCurr[prop].current = node
                                     continue
                                 }
 
-                                // Event listeners
+                                // Set event listener
                                 if (/^on.+/i.test(prop)) {
-                                    node[prop.toLowerCase()] = props[prop]
+                                    node[prop.toLowerCase()] = propsCurr[prop]
                                     continue
                                 }
 
-                                // Attributes
-                                switch (typeof props[prop]) {
-                                    case 'function':
-                                        props[prop] = props[prop]()
-                                        if (typeof props[prop] === 'boolean') {
-                                            if (props[prop]) node.setAttribute(prop, '')
-                                            continue
-                                        }
-                                        if (props[prop] != null) node.setAttribute(prop, props[prop])
-                                        continue
+                                // Skip same value attributes
+                                if (propsPrev[prop] !== undefined && propsPrev[prop] === propsCurr[prop]) continue
 
-                                    case 'boolean':
-                                        if (props[prop]) node.setAttribute(prop, '')
-                                        continue
+                                // Set attribute value
+                                if (typeof propsCurr[prop] === 'boolean' && propsCurr[prop]) node.setAttribute(prop, '')
+                                else if (propsCurr[prop] != null) node.setAttribute(prop, propsCurr[prop])
+                                else node.removeAttribute(prop)
 
-                                    default:
-                                        if (props[prop] != null) node.setAttribute(prop, props[prop])
-                                        continue
-                                }
                             }
+
                         }
 
                     }

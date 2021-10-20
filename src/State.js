@@ -1,7 +1,6 @@
 import { currentFiber, dispatchUpdate } from './ui/renderer'
 
 export const statesWatchers = new WeakMap()
-window.states = statesWatchers // debug
 
 export default function State(initial) {
 

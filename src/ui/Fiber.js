@@ -59,15 +59,11 @@ export default class Fiber
         fiber.watching.forEach(globalState => {
             const watchers = statesWatchers.get(globalState)
             const index = watchers.indexOf(this)
-            if (index === -1) {
-                console.log('-1 !!! ', fiber.type.name) // debug
-                return
-            }
+            if (index === -1) return
             watchers[index] = fiber
         })
 
         if (this.inQueue) {
-            // console.log('inQUeue') // debug
             const index = queue.indexOf(this)
             if (index !== -1) queue[queue.indexOf(this)] = fiber
         }
