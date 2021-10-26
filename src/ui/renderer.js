@@ -593,7 +593,6 @@ function commit() {
         while (theFiber) {
 
             if (theFiber.isComponent) {
-                console.log(theFiber)
                 if (theFiber.watching.length) {
                         theFiber.watching.forEach(globalState => {
                             const watchers = statesWatchers.get(globalState)
@@ -657,7 +656,6 @@ function commit() {
         for (let i=onUpdateQueue.length-1; i>-1; i--) {
             let fiber = onUpdateQueue[i];
             fiber.effects.forEach((effect, index) => {
-                console.log('effect deps check')
                 if (!effect) return;
                 if (!fiber.alternate || fiber.effectsDependencies[index] === null) return fiber.effectsCleanups[index] = effect()
                 if (!fiber.effectsDependencies[index].length) return
