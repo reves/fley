@@ -538,6 +538,9 @@ function commit() {
                                 else if (propsCurr[prop] != null) node.setAttribute(prop, propsCurr[prop])
                                 else node.removeAttribute(prop)
 
+                                // Set value
+                                if (prop === 'value') node.value = propsCurr[prop]
+
                             }
 
                         }
@@ -600,8 +603,6 @@ function commit() {
                             const index = watchers.indexOf(theFiber)
                             watchers.splice(index, 1)
                         })
-
-                        // theFiber.watching = []
                 }
 
                 if (theFiber.effectsCleanups.length) {
