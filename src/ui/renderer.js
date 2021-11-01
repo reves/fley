@@ -559,6 +559,11 @@ function commit() {
             }
         }
 
+        // Free memory
+        if (fiber.alternate != null) fiber.alternate.next = null
+        fiber.alternate = null
+
+        // Next fiber
         if (fiber.child && !(fiber.tag === tag.MOVE || fiber.tag === tag.SAVE)) {
             fiber = fiber.child
             continue
