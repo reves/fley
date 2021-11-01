@@ -12,9 +12,14 @@ const [router, setState] = State({
 })
 
 router.go = function(path) {
-    if (path === window.location.pathname) return setState() // Force components update
-    window.history.pushState({}, '', path)
-    matchRoute(path)
+    if (path === window.location.pathname) {
+        // Force components update
+        setState()
+    } else {
+        window.history.pushState({}, '', path)
+        matchRoute(path)
+    }
+    window.scrollTo(0, 0)
 }
 
 router.define = function(newRoutes = {}) {
