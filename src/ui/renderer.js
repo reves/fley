@@ -202,8 +202,9 @@ function updateHostInline(fiber) {
 
         for (const prop in props) {
 
-            // Reserved prop
+            // Reserved props
             if (prop === 'children') continue
+            if (prop === 'html') continue
 
             // Set Ref
             if (prop === 'ref') {
