@@ -2,13 +2,12 @@ import Fiber from './ui/Fiber'
 import { normalize } from './ui/Element'
 import { currentFiber, dispatchUpdate } from './ui/renderer'
 
-export default function ley(rootElementId, children) {
+export default function ley(children) {
 
-    const rootElement = document.getElementById(rootElementId)
-    rootElement.innerHTML = ''
+    document.body.innerHTML = ''
 
     const rootFiber = new Fiber
-    rootFiber.node = rootElement
+    rootFiber.node = document.body
     rootFiber.props = { children: normalize(children) }
 
     dispatchUpdate(rootFiber)
