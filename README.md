@@ -1,2 +1,2 @@
 # ley
-Frontend JavaScript web framework based on JSX syntax
+Frontend JavaScript web framework based on JSX syntax and concurrency
