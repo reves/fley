@@ -1,58 +1,55 @@
-import State from './State'
+import { createStore } from './ui/hooks'
 
-let routes = {}
+/**
+ * TODO:
+ * - actions: change title, meta tags
+ * - dummy url (e.g. /search) - ?
+ */
 
-const [router, setState] = State({
-    name: '',
-    path: '',
-    params: {},
-    query: {},
-    hash: '',
-    redirectedFrom: ''
-})
+class Router {
 
-router.go = function(path) {
-    if (path === window.location.pathname) {
-        // Force components update
-        setState()
-    } else {
-        window.history.pushState({}, '', path)
-        matchRoute(path)
+    static routes = {}
+
+    constructor() {
+        this.name = ''
+        this.path = ''
+        this.params = {}
+        this.query = {}
+        this.hash = ''
+        this.redirectedFrom = ''
     }
-    window.scrollTo(0, 0)
-}
 
-router.define = function(newRoutes = {}) {
-    routes = newRoutes
-    matchRoute(window.location.pathname)
-}
+    go(path) {
+        if (path === window.location.pathname) return
+        window.history.pushState({}, '', path)
+        window.scrollTo(0, 0)
+        Router.matchRoute.call(this, path)
+    }
 
-function matchRoute(path) {
+    define(newRoutes = {}) {
+        this.routes = newRoutes
+        Router.matchRoute.call(this, window.location.pathname)
+    }
 
-    let name = ''
-    let params = {}
-
-    for (let route in routes) {
-
-        const result = path.match(routes[route])
-
-        if (result && result.shift() === path) {
-            name = route
-            params = result.groups || {}
-            break
+    static matchRoute(path) {
+        this.redirectedFrom = this.name
+        this.name = ''
+        this.path = path
+        this.params = {}
+        this.query = Object.fromEntries(new URLSearchParams(window.location.search))
+        this.hash = window.location.hash
+        for (let route in this.routes) {
+            const result = path.match(this.routes[route])
+            if (result && result.shift() === path) {
+                this.name = route
+                this.params = result.groups || {}
+                return
+            }
         }
     }
-
-    setState({
-        name,
-        path,
-        params,
-        query: Object.fromEntries(new URLSearchParams(window.location.search)),
-        hash: window.location.hash,
-        redirectedFrom: router.name
-    })
-
 }
+
+const router = createStore(Router)
 
 // Set the initial window history state
 try { window.history.replaceState({}, '', window.location.href) } catch(error) {}
@@ -62,7 +59,6 @@ window.addEventListener('popstate', () => matchRoute(window.location.pathname))
 
 // Listen for click events on relative path links
 document.addEventListener('click', event => {
-
     if (
         event.defaultPrevented ||
         event.button !== 0 ||
@@ -75,24 +71,33 @@ document.addEventListener('click', event => {
     }
 
     let element = event.target
-
-    while (element && !(element instanceof HTMLAnchorElement || element instanceof HTMLAreaElement)) {
+    while (element && 
+        !(
+            element instanceof HTMLAnchorElement || 
+            element instanceof HTMLAreaElement
+        )
+    ) {
         element = element.parentElement
     }
 
-    if (!element || (element.hasAttribute('target') && element.getAttribute('target').trim() !== '_self')) {
+    if (!element || 
+        (
+            element.hasAttribute('target') && 
+            element.getAttribute('target').trim() !== '_self'
+        )
+    ) {
         return
     }
 
     let href = element.getAttribute('href')
-
     if (!href) return event.preventDefault()
     if (href[0] !== '/') return
-    if (href.length > 1 && href[href.length - 1] === '/') href = href.substring(0, href.length - 1)
+    if (href.length > 1 && href[href.length - 1] === '/') {
+        href = href.substring(0, href.length - 1)
+    }
 
     event.preventDefault()
     router.go(href)
-
     return false
 })
 

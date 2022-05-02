@@ -1,30 +1,18 @@
 import Fiber from './ui/Fiber'
-import { normalize } from './ui/Element'
-import { currentFiber, dispatchUpdate } from './ui/renderer'
+import Element from './ui/Element'
+import { update } from './ui/renderer'
 
 export default function ley(children) {
-
     document.body.innerHTML = ''
-
-    const rootFiber = new Fiber
-    rootFiber.node = document.body
-    rootFiber.props = { children: normalize(children) }
-
-    dispatchUpdate(rootFiber)
+    update( new Fiber( new Element(null, { children }), document.body) )
 }
 
-export function useRef(initial = null) {
-    return { current: initial }
-}
-
-export function useEffect(effect, dependencies = null) {
-
-    if (!currentFiber) return
-
-    const index = currentFiber.hookIndex++
-
-    currentFiber.effects[index] = effect
-    currentFiber.effectsDependencies[index] = dependencies
-}
-
+export {
+    useState,
+    useRef,
+    useEffect,
+    useLayoutEffect,
+    useStore,
+    createStore
+} from './ui/hooks'
 export { Fragment, Inline } from './ui/Element'

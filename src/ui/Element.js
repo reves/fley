@@ -1,27 +1,22 @@
+/**
+ * Symbols for JSX element types
+ */
 export const Fragment = 'FRAGMENT'
 export const Inline = 'INLINE'
 export const Text = 'TEXT'
 
-export default class Element
-{
-    constructor(type, props, key)
-    {
-        if (props.hasOwnProperty('children')) {
-            props.children = normalize(props.children)
-        }
-
-        this.type = type
-        this.props = props
-        this.key = key?.toString() ?? key
-
-        // Reconcile-specific reference
-        this.alternateWithSameKey = null
-    }
-
+/**
+ * Creates a JSX element.
+ */
+export default function Element(type, props, key) {
+    if (props.hasOwnProperty('children')) props.children = normalize(props.children)
+    this.type = type
+    this.props = props
+    this.key = key?.toString() ?? key
 }
 
 /**
- * Returns an array of normalized children.
+ * Returns an Array of normalized children.
  */
 export function normalize(children) {
 
@@ -31,6 +26,7 @@ export function normalize(children) {
     // Flatten nested arrays
     children = Array.isArray(children) ? [].concat(...children) : [children]
 
+    // Process children
     for (let i=0, n=children.length; i<n; i++) {
 
         const child = children[i]
@@ -53,10 +49,9 @@ export function normalize(children) {
         }
 
         // Filter Elements that have duplicate keys
-        if (child.key != null && !keys.includes(child.key)) {
+        if (child.key != null) {
+            if (keys.includes(child.key)) continue
             keys.push(child.key)
-            result.push(child)
-            continue
         }
 
         result.push(child)

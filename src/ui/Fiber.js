@@ -1,133 +1,58 @@
-import { statesWatchers } from '../State'
-import { queue } from './renderer'
-
 export const tag = {
-    UPDATE: 'UPDATE',
-    INSERT: 'INSERT',
-    MOVE:   'MOVE',
-    SAVE:   'SAVE', // just fiber.tag == null ?
+    INSERT: 1,
+    UPDATE: 2,
+    SKIP:   3,
 }
 
-export default class Fiber
-{
-    constructor()
-    {
-        this.isComponent = false
-        this.node = null
-        this.type = null
-        this.props = null
-        this.key = null
-        this.alternate = null
-        this.next = null
-        this.child = null
-        this.parent = null
-        this.sibling = null
-        this.states = []
-        this.hookIndex = 0
-        this.watching = []
-        this.inQueue = false
-        this.onUpdate = null
-        this.effects = []
-        this.effectsDependencies = []
-        this.effectsCleanups = []
+export default function Fiber(element, node, parent, tag, relation) {
+    this.type = element?.type ?? null
+    this.isComponent = (element && typeof element.type === 'function')
+    this.node = node
+    this.props = element?.props ?? null
+    this.parent = parent
+    this.sibling = null
+    this.child = null
+    this.key = element?.key ?? null
+    this.alt = null
+    this.tag = tag
+    this.relation = relation
+    this.hooks = this.isComponent ? new Hooks : null
+}
 
-        // Reconcile
-        this.skip = false
-
-        // Commit
-        this.tag = null
-        this.relFiber = null
+export function clone(alt, parent, pendingProps, tag, relation) {
+    const fiber = new Fiber
+    fiber.type = alt.type
+    fiber.isComponent = alt.isComponent
+    fiber.node = alt.node
+    fiber.props = pendingProps ?? alt.props
+    fiber.parent = parent ?? alt.parent
+    fiber.key = alt.key
+    fiber.alt = alt
+    fiber.tag = tag
+    fiber.relation = relation
+    if (fiber.isComponent) {
+        fiber.hooks = new Hooks
+        fiber.hooks.states = alt.hooks.states
+        fiber.hooks.stores = alt.hooks.stores
+        fiber.hooks.ref = alt.hooks.ref
     }
+    return fiber
+}
 
-    clone(parent, pendingProps)
-    {
-        const fiber = new Fiber
-        this.alternate = null
-        this.next = fiber
-        fiber.alternate = this
-        fiber.isComponent = this.isComponent
-        fiber.node = this.node
-        fiber.type = this.type
-        fiber.props = pendingProps || this.props
-        fiber.key = this.key
-        fiber.parent = parent || this.parent
-        fiber.states = this.states
-        fiber.watching = this.watching
-        fiber.onUpdate = this.onUpdate
-        fiber.effects = this.effects
+function Hooks() {
+    this.index = 0
+    this.effects = []
+    this.layoutEffects = []
+    this.states = []
+    this.stores = []
+    this.ref = []
+}
 
-        fiber.watching.forEach(globalState => {
-            const watchers = statesWatchers.get(globalState)
-            const index = watchers.indexOf(this)
-            if (index === -1) return
-            watchers[index] = fiber
-        })
-
-        if (this.inQueue) {
-            const index = queue.indexOf(this)
-            if (index !== -1) queue[queue.indexOf(this)] = fiber
-        }
-
-        return fiber
+export function clean(fiber) {
+    fiber.alt = null
+    fiber.tag = null
+    fiber.relation = null
+    if (fiber.isComponent) {
+        fiber.hooks.index = 0
     }
-
-    cloneTree(parent)
-    {
-        const fiber = this.clone(parent)
-
-        fiber.skipReconcile = true
-        fiber.child = this.child.clone(fiber)
-
-        // Clone subtree
-        let alternate = this.child
-        let current = fiber.child
-
-        while (true) {
-
-            if (alternate.child) {
-                current.child = alternate.child.clone(current)
-                alternate = alternate.child
-                current = current.child
-                continue
-            }
-
-            if (alternate.sibling) {
-                current.sibling = alternate.sibling.clone(current.parent)
-                alternate = alternate.sibling
-                current = current.sibling
-                continue
-            }
-
-            while (alternate.parent !== this && !alternate.parent.sibling) {
-                alternate = alternate.parent
-                current = current.parent
-            }
-
-            if (alternate.parent === this) break
-
-            if (alternate.parent.sibling) {
-                current.parent.sibling = alternate.parent.sibling.clone(current.parent.parent)
-                alternate = alternate.parent.sibling
-                current = current.parent.sibling
-                continue
-            }
-
-            break
-
-        }
-
-        return fiber
-    }
-
-    static from(element, parentFiber)
-    {
-        const fiber = new Fiber
-        fiber.isComponent = typeof element.type === 'function'
-        fiber.type = element.type
-        fiber.props = element.props
-        fiber.key = element.key
-        fiber.parent = parentFiber
-        return fiber
-    }
-
 }
