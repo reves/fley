@@ -58,7 +58,9 @@ class I18n {
 
     static getLocales() {
         const locales = {}
-        for (const key in this.locales) locales[key] = this.locales[key].$?.name ?? ''
+        for (const key in this.locales) {
+            locales[key] = this.locales[key].$?.name ?? ''
+        }
         return locales
     }
 

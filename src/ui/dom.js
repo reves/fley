@@ -40,10 +40,10 @@ export function updateNode(fiber) {
         }
         return node
     }
-    const prevProps = fiber.alt?.props ?? []
+    const prevProps = fiber.alt?.props ?? {}
     const reserved = (prop) => prop === 'children' || prop === 'html'
 
-    // Obsolete
+    // Obsolete props
     for (const prop in prevProps) {
         if (reserved(prop)) continue
 
@@ -66,7 +66,7 @@ export function updateNode(fiber) {
         node.removeAttribute(prop)
     }
 
-    // Updated
+    // Updated props
     for (const prop in nextProps) {
         if (reserved(prop)) continue
 
@@ -82,7 +82,7 @@ export function updateNode(fiber) {
             continue
         }
 
-        // Skip props with the same value
+        // Skip same values
         if (prevProps.hasOwnProperty(prop) && prevProps[prop] === nextProps[prop]) {
             continue
         }

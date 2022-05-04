@@ -5,14 +5,14 @@ export const tag = {
 }
 
 export default function Fiber(element, node, parent, tag, relation) {
-    this.type = element?.type ?? null
-    this.isComponent = (element && typeof element.type === 'function')
+    this.type = element?.type
+    this.isComponent = (typeof this.type === 'function')
     this.node = node
-    this.props = element?.props ?? null
+    this.props = element?.props
     this.parent = parent
     this.sibling = null
     this.child = null
-    this.key = element?.key ?? null
+    this.key = element?.key
     this.alt = null
     this.tag = tag
     this.relation = relation

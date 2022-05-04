@@ -74,7 +74,7 @@ export function useStore(store) {
     if (currentFiber.alt) return
     let fiber = currentFiber
     while (fiber) {
-        if (fiber.isComponent && fiber.hooks.stores.indexOf(store) !== -1) return
+        if (fiber.isComponent && ~fiber.hooks.stores.indexOf(store)) return
         fiber = fiber.parent
     }
     currentFiber.hooks.stores.push(store)
@@ -84,5 +84,5 @@ export function useStore(store) {
 export function loseStore(store, fiber) {
     const watchers = storesWatchers.get(store)
     const index = watchers.indexOf(fiber)
-    if (index !== -1) watchers.splice(index, 1)
+    if (~index) watchers.splice(index, 1)
 }

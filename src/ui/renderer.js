@@ -364,7 +364,7 @@ function mutate(fiber) {
         fiber.alt.hooks.stores.forEach(s => {
             const watchers = storesWatchers.get(s)
             const index = watchers.indexOf(fiber.alt)
-            if (index === -1) watchers.push(fiber)
+            if (!~index) watchers.push(fiber)
             else watchers[index] = fiber
         })
     }

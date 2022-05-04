@@ -9,10 +9,12 @@ export const Text = 'TEXT'
  * Creates a JSX element.
  */
 export default function Element(type, props, key) {
-    if (props.hasOwnProperty('children')) props.children = normalize(props.children)
+    if (props.hasOwnProperty('children')) {
+        props.children = normalize(props.children)
+    }
     this.type = type
     this.props = props
-    this.key = key?.toString() ?? key
+    this.key = key?.toString()
 }
 
 /**
@@ -50,7 +52,7 @@ export function normalize(children) {
 
         // Filter Elements that have duplicate keys
         if (child.key != null) {
-            if (keys.includes(child.key)) continue
+            if (~keys.indexOf(child.key)) continue
             keys.push(child.key)
         }
 

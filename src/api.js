@@ -48,7 +48,7 @@ function EventSetter(xhr) {
 
     let onSuccess, onFail, onError, doAlways
 
-    const errorHandler = () => { onError && onError(xhr.response, xhr.status) }
+    const errorHandler = () => onError && onError(xhr.response, xhr.status)
 
     xhr.addEventListener('abort', errorHandler)
     xhr.addEventListener('timeout', errorHandler)
@@ -58,7 +58,7 @@ function EventSetter(xhr) {
         if (xhr.status == 400) return onFail && onFail(xhr.response, xhr.status)
         errorHandler()
     })
-    xhr.addEventListener('loadend', () => { doAlways && doAlways(xhr.response, xhr.status) })
+    xhr.addEventListener('loadend', () => doAlways && doAlways(xhr.response, xhr.status))
 
     this.success = function(callback) {
         onSuccess = callback
