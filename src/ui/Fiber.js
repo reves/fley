@@ -40,7 +40,6 @@ export function clone(alt, parent, pendingProps, tag, relation) {
 }
 
 function Hooks() {
-    this.index = 0
     this.effects = []
     this.layoutEffects = []
     this.states = []
@@ -52,7 +51,4 @@ export function clean(fiber) {
     fiber.alt = null
     fiber.tag = null
     fiber.relation = null
-    if (fiber.isComponent) {
-        fiber.hooks.index = 0
-    }
 }

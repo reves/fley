@@ -3,11 +3,10 @@ import Fiber, { tag, clone, clean } from './Fiber'
 import Element, { Text, Inline, normalize } from './Element'
 import { is } from '../utils'
 import { loseStore } from './hooks'
-import { storesWatchers } from './hooks'
+import { resetHookIndex, storesWatchers } from './hooks'
 
 /**
  * TODO:
- * - async useEffect
  * - Rewrite some funcs to be without recursion [max callstack problem]
  */
 
@@ -16,8 +15,9 @@ let next = null
 let idleCallbackId = null
 export let currentFiber = null
 const deletions = []
+const deferredLeyoutEffects = []
 const deferredEffects = []
-let scheduledEffectsCount = 0
+let nextEffectTimeoutId = null
 
 /**
  * Initiates the rendering process of the fiber tree.
@@ -92,6 +92,7 @@ function reconcile(fiber) {
 
     switch (true) {
         case fiber.isComponent:
+            resetHookIndex()
             reconcileChildren(fiber, normalize(fiber.type(fiber.props)))
             break
 
@@ -307,6 +308,13 @@ function getElementByKey(elements, startIndex, key) {
  */
 function commit() {
 
+    // Force sync execution of remaining effects
+    if (deferredEffects.length) {
+        clearTimeout(nextEffectTimeoutId)
+        deferredEffects.forEach(e => e())
+        deferredEffects.length = 0
+    }
+
     // Relace the alternate with the updated fiber in the tree
     if (root.parent) {
         root.sibling = root.alt.sibling
@@ -324,10 +332,21 @@ function commit() {
     deletions.forEach(remove)
 
     // Produce layout effects
-    deferredEffects.forEach(e => e.cleanup = e.effect())
-    deferredEffects.length = 0
+    deferredLeyoutEffects.forEach(e => e.cleanup = e.effect())
+    deferredLeyoutEffects.length = 0
+
+    // Schedule effects
+    scheduleNextEffect()
 
     reset()
+}
+
+function scheduleNextEffect() {
+    if (!deferredEffects.length) return
+    nextEffectTimeoutId = setTimeout(() => {
+        deferredEffects.shift()()
+        scheduleNextEffect()
+    })
 }
 
 /**
@@ -358,7 +377,7 @@ function remove(fiber) {
 function mutate(fiber) {
     if (!fiber) return
     mutate(fiber.child)
-    sideEffects(fiber)
+    deferEffects(fiber)
 
     if (fiber.isComponent && fiber.alt) {
         fiber.alt.hooks.stores.forEach(s => {
@@ -411,48 +430,36 @@ function getNodes(fiber) {
 /**
  * Handles side effects.
  */
-function sideEffects(fiber) {
+function deferEffects(fiber) {
     if (!fiber.isComponent) return
 
     // Defer layout effects
     let prevEffects = fiber.alt?.hooks.layoutEffects
-    let nextEffects = fiber.hooks.layoutEffects
-    nextEffects.forEach((_, i) => {
+    fiber.hooks.layoutEffects.forEach((next, i) => {
         if (prevEffects) {
-            if (identical(prevEffects[i].deps, nextEffects[i].deps)) {
-                nextEffects[i].cleanup = prevEffects[i].cleanup
-                return
-            }
-            if (prevEffects[i].cleanup) prevEffects[i].cleanup()
+            const prev = prevEffects[i]
+            if (depsUnchanged(prev, next)) return
+            if (prev.cleanup) prev.cleanup()
         }
-        deferredEffects.push(nextEffects[i])
+        deferredLeyoutEffects.push(next)
     })
 
-    // Schedule effects
+    // Defer effects
     prevEffects = fiber.alt?.hooks.effects
-    nextEffects = fiber.hooks.effects
-    nextEffects.forEach((_, i) => {
-        /* if (prevEffects && identical(prevEffects[i].deps, nextEffects[i].deps)) {
-            nextEffects[i].cleanup = prevEffects[i].cleanup
-            return
+    fiber.hooks.effects.forEach((next, i) => {
+        if (prevEffects) {
+            const prev = prevEffects[i]
+            if (depsUnchanged(prev, next)) return
+            if (prev.cleanup) deferredEffects.push(() => prev.cleanup())
         }
-        setTimeout(() => {
-            if (prevEffects && prevEffects[i].cleanup) prevEffects[i].cleanup()
-            nextEffects[i].cleanup = nextEffects[i].effect()
-            scheduledEffectsCount--
-        })
-        scheduledEffectsCount++ */
-        if (prevEffects) { /////////////////////////// DEBUG
-            if (identical(prevEffects[i].deps, nextEffects[i].deps)) {
-                nextEffects[i].cleanup = prevEffects[i].cleanup
-                return
-            }
-            if (prevEffects[i].cleanup) prevEffects[i].cleanup()
-        }
-        deferredEffects.push(nextEffects[i])
+        deferredEffects.push(() => next.cleanup = next.effect())
     })
 }
 
-function identical(prev, next) {
-    return prev ? prev.every((_, i) => is(prev[i], next[i])) : false
+function depsUnchanged(prev, next) {
+    if (prev.deps && prev.deps.every((pd, i) => is(pd, next.deps[i]))) {
+        next.cleanup = prev.cleanup
+        return true
+    }
+    return false
 }

@@ -1,5 +1,8 @@
 import { currentFiber, update } from './renderer'
 
+let hookIndex = 0
+export const resetHookIndex = _ => hookIndex = 0
+
 // Effect
 function Effect(effect, deps) {
     this.effect = effect
@@ -8,25 +11,22 @@ function Effect(effect, deps) {
 }
 
 export function useEffect(effect, deps = null) {
-    const index = currentFiber.hooks.index++
-    currentFiber.hooks.effects[index] = new Effect(effect, deps)
+    currentFiber.hooks.effects[hookIndex++] = new Effect(effect, deps)
 }
 
 export function useLayoutEffect(effect, deps = null) {
-    const index = currentFiber.hooks.index++
-    currentFiber.hooks.layoutEffects[index] = new Effect(effect, deps)
+    currentFiber.hooks.layoutEffects[hookIndex++] = new Effect(effect, deps)
 }
 
 // Ref
 export function useRef(initial = null) {
-    const index = currentFiber.hooks.index++
-    return currentFiber.hooks.ref[index] ?? { current: initial }
+    return currentFiber.hooks.ref[hookIndex++] ?? { current: initial }
 }
 
 // State
 export function useState(initial) {
+    const index = hookIndex++
     const fiber = currentFiber
-    const index = fiber.hooks.index++
     const state = fiber.hooks.states.hasOwnProperty(index)
         ? fiber.hooks.states[index]
         : fiber.hooks.states[index] = initial

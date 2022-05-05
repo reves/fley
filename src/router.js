@@ -2,6 +2,7 @@ import { createStore } from './ui/hooks'
 
 /**
  * TODO:
+ * - onGo event (e.g. scroll to top App wrapper)
  * - actions: change title, meta tags
  * - dummy url (e.g. /search) - ?
  */
@@ -20,9 +21,9 @@ class Router {
     }
 
     go(path) {
-        if (path === window.location.pathname) return
-        window.history.pushState({}, '', path)
-        window.scrollTo(0, 0)
+        if (path !== window.location.pathname){
+            window.history.pushState({}, '', path)
+        }
         Router.matchRoute.call(this, path)
     }
 
@@ -55,7 +56,7 @@ const router = createStore(Router)
 try { window.history.replaceState({}, '', window.location.href) } catch(error) {}
 
 // Listen for popstate events
-window.addEventListener('popstate', () => matchRoute(window.location.pathname))
+window.addEventListener('popstate', () => router.go(window.location.pathname))
 
 // Listen for click events on relative path links
 document.addEventListener('click', event => {
