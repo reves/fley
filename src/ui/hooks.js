@@ -20,7 +20,7 @@ export function useLayoutEffect(effect, deps = null) {
 
 // Ref
 export function useRef(initial = null) {
-    return currentFiber.hooks.ref[hookIndex++] ?? { current: initial }
+    return currentFiber.hooks.ref[hookIndex++] ??= { current: initial }
 }
 
 // State
