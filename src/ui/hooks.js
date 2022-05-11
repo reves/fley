@@ -26,17 +26,20 @@ export function useRef(initial = null) {
 // State
 export function useState(initial) {
     const index = hookIndex++
-    const fiber = currentFiber
-    const state = fiber.hooks.states.hasOwnProperty(index)
-        ? fiber.hooks.states[index]
-        : fiber.hooks.states[index] = initial
-    const setState = (data) => {
-        fiber.hooks.states[index] = (typeof data === 'function')
-            ? data(fiber.hooks.states[index])
-            : data
-        update(fiber)
+    const hooks = currentFiber.hooks
+    if (!hooks.states[index]) {
+        hooks.states[index] = [
+            initial,
+            (data) => {
+                if (!hooks.fiber) return
+                hooks.states[index][0] = (typeof data === 'function')
+                    ? data(hooks.states[index][0])
+                    : data
+                update(hooks.fiber)
+            }
+        ]
     }
-    return [state, setState]
+    return hooks.states[index]
 }
 
 // Store

@@ -16,7 +16,7 @@ export default function Fiber(element, node, parent, tag, relation) {
     this.alt = null
     this.tag = tag
     this.relation = relation
-    this.hooks = this.isComponent ? new Hooks : null
+    this.hooks = this.isComponent ? new Hooks(this) : null
 }
 
 export function clone(alt, parent, pendingProps, tag, relation) {
@@ -31,20 +31,20 @@ export function clone(alt, parent, pendingProps, tag, relation) {
     fiber.tag = tag
     fiber.relation = relation
     if (fiber.isComponent) {
-        fiber.hooks = new Hooks
-        fiber.hooks.states = alt.hooks.states
-        fiber.hooks.stores = alt.hooks.stores
-        fiber.hooks.ref = alt.hooks.ref
+        fiber.hooks = alt.hooks
+        fiber.hooks.effects = []
+        fiber.hooks.layoutEffects = []
     }
     return fiber
 }
 
-function Hooks() {
+function Hooks(fiber) {
     this.effects = []
     this.layoutEffects = []
     this.states = []
     this.stores = []
     this.ref = []
+    this.fiber = fiber
 }
 
 export function clean(fiber) {

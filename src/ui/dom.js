@@ -1,7 +1,7 @@
 import { Text, Inline } from './Element'
 
 /**
- * [TODO: SVG elements]
+ * TODO: SVG elements
  * 
  * Creates a DOM node.
  */

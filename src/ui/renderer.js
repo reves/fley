@@ -359,6 +359,7 @@ function unmount(fiber, depth = false) {
         fiber.hooks.layoutEffects.forEach(e => e.cleanup && e.cleanup())
         fiber.hooks.effects.forEach(e => e.cleanup && e.cleanup())
         fiber.hooks.stores.forEach(s => loseStore(s, fiber))
+        fiber.hooks.fiber = null
     }
     if (depth) unmount(fiber.sibling, true)
 }
@@ -386,6 +387,7 @@ function mutate(fiber) {
             if (!~index) watchers.push(fiber)
             else watchers[index] = fiber
         })
+        fiber.hooks.fiber = fiber
     }
 
     switch (fiber.tag) {
