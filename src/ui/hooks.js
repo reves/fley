@@ -1,4 +1,5 @@
 import { current, update } from './renderer'
+import { getMethodsNames } from '../utils'
 
 export const resetCursor = _ => cursor = 0
 let cursor = 0
@@ -77,16 +78,6 @@ export function createStore(Class) {
     const store = new Class
     storesWatchers.set(store, watchers)
     return store
-}
-
-function getMethodsNames(Class) {
-    const names = []
-    let prototype = Class.prototype
-    while (prototype.constructor !== Object) {
-        names.push(...Object.getOwnPropertyNames(prototype))
-        prototype = Object.getPrototypeOf(prototype)
-    }
-    return names.filter(n => n !== 'constructor')
 }
 
 export function useStore(store) {
