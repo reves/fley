@@ -30,20 +30,15 @@ export function clone(alt, parent, pendingProps, tag, relation) {
     fiber.alt = alt
     fiber.tag = tag
     fiber.relation = relation
-    if (fiber.isComponent) {
-        fiber.hooks = alt.hooks
-        fiber.hooks.effects = []
-        fiber.hooks.layoutEffects = []
-    }
+    fiber.hooks = alt.hooks
     return fiber
 }
 
 function Hooks(fiber) {
     this.effects = []
-    this.layoutEffects = []
     this.states = []
     this.stores = []
-    this.ref = []
+    this.refs = []
     this.fiber = fiber
 }
 

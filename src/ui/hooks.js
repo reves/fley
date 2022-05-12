@@ -1,48 +1,64 @@
-import { currentFiber, update } from './renderer'
+import { current, update } from './renderer'
 
-let hookIndex = 0
-export const resetHookIndex = _ => hookIndex = 0
+export const resetCursor = _ => cursor = 0
+let cursor = 0
 
-// Effect
-function Effect(effect, deps) {
-    this.effect = effect
-    this.deps = deps
+/**
+ * Effect
+ */
+export const effectType = {
+    EFFECT: 1,
+    LAYOUT: 2,
+}
+
+export const useEffect = (cb, deps) => effect(effectType.EFFECT, cb, deps)
+export const useLayoutEffect = (cb, deps) => effect(effectType.LAYOUT, cb, deps)
+
+function Effect(type) {
+    this.type = type
+    this.cb = null
     this.cleanup = null
+    this.deps = { prev: null, next: null }
 }
 
-export function useEffect(effect, deps = null) {
-    currentFiber.hooks.effects[hookIndex++] = new Effect(effect, deps)
+function effect(type, cb, deps) {
+    const effect = (current.hooks.effects[cursor++] ??= new Effect(type))
+    effect.cb = cb
+    effect.deps.next = deps
 }
 
-export function useLayoutEffect(effect, deps = null) {
-    currentFiber.hooks.layoutEffects[hookIndex++] = new Effect(effect, deps)
-}
-
-// Ref
+/**
+ * Ref
+ */
 export function useRef(initial = null) {
-    return currentFiber.hooks.ref[hookIndex++] ??= { current: initial }
+    return current.hooks.refs[cursor++] ??= { current: initial }
 }
 
-// State
+/**
+ * State
+ */
 export function useState(initial) {
-    const index = hookIndex++
-    const hooks = currentFiber.hooks
-    if (!hooks.states[index]) {
-        hooks.states[index] = [
+    const i = cursor++
+    const hooks = current.hooks
+    const states = hooks.states
+    if (!states[i]) {
+        states[i] = [
             initial,
             (data) => {
                 if (!hooks.fiber) return
-                hooks.states[index][0] = (typeof data === 'function')
-                    ? data(hooks.states[index][0])
+                states[i][0] = (typeof data === 'function')
+                    ? data(states[i][0])
                     : data
                 update(hooks.fiber)
             }
         ]
     }
-    return hooks.states[index]
+    return states[i]
 }
 
-// Store
+/**
+ * Store
+ */
 export const storesWatchers = new WeakMap
 
 export function createStore(Class) {
@@ -74,18 +90,18 @@ function getMethodsNames(Class) {
 }
 
 export function useStore(store) {
-    if (currentFiber.alt) return
-    let fiber = currentFiber
+    if (current.alt) return
+    let fiber = current
     while (fiber) {
         if (fiber.isComponent && ~fiber.hooks.stores.indexOf(store)) return
         fiber = fiber.parent
     }
-    currentFiber.hooks.stores.push(store)
-    storesWatchers.get(store).push(currentFiber)
+    current.hooks.stores.push(store)
+    storesWatchers.get(store).push(current)
 }
 
 export function loseStore(store, fiber) {
     const watchers = storesWatchers.get(store)
-    const index = watchers.indexOf(fiber)
-    if (~index) watchers.splice(index, 1)
+    const i = watchers.indexOf(fiber)
+    if (~i) watchers.splice(i, 1)
 }

@@ -3,21 +3,23 @@ import Fiber, { tag, clone, clean } from './Fiber'
 import Element, { Text, Inline, normalize } from './Element'
 import { is } from '../utils'
 import { loseStore } from './hooks'
-import { resetHookIndex, storesWatchers } from './hooks'
+import { resetCursor, effectType, storesWatchers } from './hooks'
 
 /**
  * TODO:
- * - Rewrite some funcs to be without recursion [max callstack problem]
+ * - Consider [maximum call stack], when a fiber has many children.
  */
 
+export let current = null
 let root = null
 let next = null
 let idleCallbackId = null
-export let currentFiber = null
 const deletions = []
-const deferredLeyoutEffects = []
-const deferredEffects = []
-let nextEffectTimeoutId = null
+const queue = {
+    layoutEffects: [],
+    effects: [],
+    effectTimeoutId: null
+}
 
 /**
  * Initiates the rendering process of the fiber tree.
@@ -60,7 +62,7 @@ function reset() {
     deletions.length = 0
     root = null
     next = null
-    currentFiber = null
+    current = null
 }
 
 /**
@@ -70,7 +72,7 @@ function render(deadline) {
 
     // Main loop
     while (deadline.timeRemaining() > 0 && next) {
-        currentFiber = next
+        current = next
         next = reconcile(next)
     }
 
@@ -92,7 +94,7 @@ function reconcile(fiber) {
 
     switch (true) {
         case fiber.isComponent:
-            resetHookIndex()
+            resetCursor()
             reconcileChildren(fiber, normalize(fiber.type(fiber.props)))
             break
 
@@ -309,10 +311,10 @@ function getElementByKey(elements, startIndex, key) {
 function commit() {
 
     // Force sync execution of remaining effects
-    if (deferredEffects.length) {
-        clearTimeout(nextEffectTimeoutId)
-        deferredEffects.forEach(e => e())
-        deferredEffects.length = 0
+    if (queue.effects.length) {
+        clearTimeout(queue.effectTimeoutId)
+        queue.effects.forEach(e => e())
+        queue.effects.length = 0
     }
 
     // Relace the alternate with the updated fiber in the tree
@@ -332,8 +334,8 @@ function commit() {
     deletions.forEach(remove)
 
     // Produce layout effects
-    deferredLeyoutEffects.forEach(e => e.cleanup = e.effect())
-    deferredLeyoutEffects.length = 0
+    queue.layoutEffects.forEach(e => e.cleanup = e.cb())
+    queue.layoutEffects.length = 0
 
     // Schedule effects
     scheduleNextEffect()
@@ -342,9 +344,9 @@ function commit() {
 }
 
 function scheduleNextEffect() {
-    if (!deferredEffects.length) return
-    nextEffectTimeoutId = setTimeout(() => {
-        deferredEffects.shift()()
+    if (!queue.effects.length) return
+    queue.effectTimeoutId = setTimeout(() => {
+        queue.effects.shift()()
         scheduleNextEffect()
     })
 }
@@ -356,10 +358,9 @@ function unmount(fiber, depth = false) {
     if (!fiber) return
     unmount(fiber.child, true)
     if (fiber.isComponent) {
-        fiber.hooks.layoutEffects.forEach(e => e.cleanup && e.cleanup())
-        fiber.hooks.effects.forEach(e => e.cleanup && e.cleanup())
-        fiber.hooks.stores.forEach(s => loseStore(s, fiber))
         fiber.hooks.fiber = null
+        fiber.hooks.effects.forEach(e => e.cleanup && e.cleanup())
+        fiber.hooks.stores.forEach(store => loseStore(store, fiber))
     }
     if (depth) unmount(fiber.sibling, true)
 }
@@ -376,19 +377,11 @@ function remove(fiber) {
  * Performs DOM mutations.
  */
 function mutate(fiber) {
-    if (!fiber) return
-    mutate(fiber.child)
-    deferEffects(fiber)
 
-    if (fiber.isComponent && fiber.alt) {
-        fiber.alt.hooks.stores.forEach(s => {
-            const watchers = storesWatchers.get(s)
-            const index = watchers.indexOf(fiber.alt)
-            if (!~index) watchers.push(fiber)
-            else watchers[index] = fiber
-        })
-        fiber.hooks.fiber = fiber
-    }
+    if (!fiber) return
+
+    mutate(fiber.child)
+    side(fiber)
 
     switch (fiber.tag) {
         case tag.INSERT:
@@ -430,38 +423,47 @@ function getNodes(fiber) {
 }
 
 /**
- * Handles side effects.
+ * Handles component side effects.
  */
-function deferEffects(fiber) {
+function side(fiber) {
+
     if (!fiber.isComponent) return
 
-    // Defer layout effects
-    let prevEffects = fiber.alt?.hooks.layoutEffects
-    fiber.hooks.layoutEffects.forEach((next, i) => {
-        if (prevEffects) {
-            const prev = prevEffects[i]
-            if (depsUnchanged(prev, next)) return
-            if (prev.cleanup) prev.cleanup()
-        }
-        deferredLeyoutEffects.push(next)
+    // Update Hooks to Fiber reference
+    fiber.hooks.fiber = fiber
+
+    // Update stores watchers lists
+    fiber.alt?.hooks.stores.forEach((store) => {
+        const watchers = storesWatchers.get(store)
+        const index = watchers.indexOf(fiber.alt)
+        if (!~index) watchers.push(fiber)
+        else watchers[index] = fiber
     })
 
-    // Defer effects
-    prevEffects = fiber.alt?.hooks.effects
-    fiber.hooks.effects.forEach((next, i) => {
-        if (prevEffects) {
-            const prev = prevEffects[i]
-            if (depsUnchanged(prev, next)) return
-            if (prev.cleanup) deferredEffects.push(() => prev.cleanup())
-        }
-        deferredEffects.push(() => next.cleanup = next.effect())
-    })
-}
+    // Handle effects
+    fiber.hooks.effects.forEach((effect) => {
+        
+        const prev = effect.deps.prev
+        const next = effect.deps.next
 
-function depsUnchanged(prev, next) {
-    if (prev.deps && prev.deps.every((pd, i) => is(pd, next.deps[i]))) {
-        next.cleanup = prev.cleanup
-        return true
-    }
-    return false
+        // Dependencies unchanged
+        if (prev && prev.length === next.length && prev.every((p, i) => is(p, next[i]))) {
+            return
+        }
+
+        // Depencencies changed
+        const cleanup = effect.cleanup
+        switch (effect.type) {
+            case effectType.EFFECT:
+                if (cleanup) queue.effects.push(() => cleanup())
+                queue.effects.push(() => effect.cleanup = effect.cb())
+                break
+
+            case effectType.LAYOUT:
+                if (cleanup) cleanup()
+                queue.layoutEffects.push(effect)
+                break
+        }
+        effect.deps.prev = next
+    })
 }
