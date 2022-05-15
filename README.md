@@ -1,9 +1,9 @@
 # _ley_ – Frontend JavaScript Web Framework
 
-* [JSX syntax](https://github.com/facebook/jsx)
-* Concurrent Renderer – [Fiber Architecture](https://github.com/acdlite/react-fiber-architecture)
+* [JSX syntax &#x1F6C8;](https://github.com/facebook/jsx)
+* Concurrent Renderer – [Fiber Architecture &#x1F6C8;](https://github.com/acdlite/react-fiber-architecture)
 * [Hooks](#hooks)
-* [Stores – Global States](#store)
+* [Store – Global State](#store)
 * Router
 * I18n
 * HTTP API Client
