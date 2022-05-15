@@ -28,10 +28,9 @@ export function update(fiber) {
 
     // Already rendering
     if (root) {
-        const alt = root.alt
         const parents = []
 
-        let parent = alt
+        let parent = root.alt
         while (parent) {
             if (parent.isComponent) parents.push(parent)
             parent = parent.parent
@@ -332,6 +331,7 @@ function commit() {
     deletions.forEach(fiber => unmount(fiber))
     mutate(root)
     deletions.forEach(remove)
+    reset()
 
     // Produce layout effects
     queue.layoutEffects.forEach(e => e.cleanup = e.cb())
@@ -339,8 +339,6 @@ function commit() {
 
     // Schedule effects
     scheduleNextEffect()
-
-    reset()
 }
 
 function scheduleNextEffect() {
@@ -374,12 +372,10 @@ function remove(fiber) {
 }
 
 /**
- * Performs DOM mutations.
+ * Performs DOM mutations and components side effects.
  */
 function mutate(fiber) {
-
     if (!fiber) return
-
     mutate(fiber.child)
     side(fiber)
 
