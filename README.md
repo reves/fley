@@ -1,13 +1,14 @@
-# _ley_ – Frontend JavaScript Web Framework
+# ley
 
-* [JSX syntax &#x1F6C8;](https://github.com/facebook/jsx)
-* Concurrent Renderer – [Fiber Architecture &#x1F6C8;](https://github.com/acdlite/react-fiber-architecture)
-* [Hooks](#hooks)
-* [Store – Global State](#store)
-* Router
-* I18n
-* HTTP API Client
+Frontend JavaScript web framework based on [JSX syntax](https://github.com/facebook/jsx) and concurrent renderer with [Fiber Architecture](https://github.com/acdlite/react-fiber-architecture).
 
+- [Hooks](#hooks)
+- [Store (global states)](#store)
+- [Router](#router)
+- [I18n](#i18n)
+- HTTP API Client
+
+## Usage
 ```javascript
 import ley, { useState } from 'ley'
 
@@ -22,18 +23,18 @@ function App() {
 ley(<App/>) // By default, uses document.body as the root element.
 ```
 
-# Hooks
-* [useState](#usestate)
-* [useEffect, useLayoutEffect](#useEffect)
-* [useRef](#useref)
-* [useStore](#usestore)
+## Hooks
+- [useState](#usestate)
+- [useEffect, useLayoutEffect](#useEffect)
+- [useRef](#useref)
+- [useStore](#usestore)
 
-## useState
+### useState
 ```javascript
 const [state, setState] = useState(initialValue)
 ```
 
-## <a id='useEffect'></a> useEffect  `(async)`, useLayoutEffect `(sync)`
+### <a id='useEffect'></a> useEffect  `(async)`, useLayoutEffect `(sync)`
 ```javascript
 useEffect(() => {
     // side effect
@@ -45,7 +46,7 @@ useEffect(func, [])
 useEffect(func, [a, b])
 ```
 
-## useRef
+### useRef
 ```javascript
 const ref = useRef(initialValue)
 ```
@@ -60,7 +61,7 @@ function Component() {
 }
 ```
 
-## useStore
+### useStore
 ```javascript
 useStore(store)
 ```
@@ -71,8 +72,11 @@ function Component() {
 }
 ```
 
-# Store
-## createStore
+## Store
+- [createStore](#createstore)
+
+A store is an object that contains a global state (properties) and its actions (methods).
+### createStore
 ```javascript
 createStore(Class)
 ```
@@ -87,8 +91,9 @@ class ThemeStore
     }
 
     toggleStyle()
-    {   
-        // Calls to other methods do not cause additional rendering
+    {
+        // Calls to other actions do not cause additional rendering.
+        // Returning "null" prevents rendering.
         return this.style === 'light'
             ? this.setStyle('dark')
             : this.setStyle('light')
@@ -96,7 +101,6 @@ class ThemeStore
 
     setStyle(style)
     {
-        // Returning "null" prevents rendering
         if (!ThemeStore.styles.includes(style)) {
             return null
         }
@@ -113,4 +117,53 @@ function Component() {
         <button onClick={() => theme.toggleStyle()}>Change theme style</button>
     </>
 }
+```
+
+## Router
+
+- [router.define()](#routerdefine)
+- [router.go()](#routergo)
+```javascript
+import router from 'ley/router'
+import Home from 'Home'
+import About from 'About'
+
+router.define({
+	home: /\/$/i,
+	about: /\/about/i
+})
+
+function App() {
+    useStore(router)
+    return <>
+        <nav>
+            <a href="/">Home</a>|
+            <a href="/about">About Us</a>
+        </nav>
+        <div>
+            { router.name === 'home'
+                ? <Home />
+                : router.name === 'about'
+                    ? <About />
+                    : 'Page not found'
+            }
+        </div>
+    </>
+}
+```
+### router.define()
+Defines named routes.
+```javascript
+router.define({
+	home: /\/$/i, // name: new RegExp()
+})
+```
+### router.go()
+Navigates programmatically.
+```javascript
+router.go('/about')
+```
+## I18n
+```javascript
+import i18n, { t } from 'ley/i18n'
 ```
