@@ -2,9 +2,7 @@ import { createStore } from './ui/hooks'
 
 /**
  * TODO:
- * - onGo event (e.g. scroll to top App wrapper)
  * - actions: change title, meta tags
- * - dummy url (e.g. /search) - ?
  */
 
 class Router {
@@ -13,40 +11,38 @@ class Router {
 
     constructor() {
         this.name = ''
-        this.path = ''
+        this.path = '/'
         this.params = {}
         this.query = {}
         this.hash = ''
         this.redirectedFrom = ''
     }
 
-    go(path) {
+    define(routes = {}) {
+        Router.routes = routes
+        this.go(window.location.pathname)
+    }
+
+    go(path, cb) {
+        path = path[0] === '/' ? path : ('/' + path)
         if (path !== window.location.pathname){
             window.history.pushState({}, '', path)
         }
-        Router.matchRoute.call(this, path)
-    }
-
-    define(newRoutes = {}) {
-        this.routes = newRoutes
-        Router.matchRoute.call(this, window.location.pathname)
-    }
-
-    static matchRoute(path) {
         this.redirectedFrom = this.name
         this.name = ''
         this.path = path
         this.params = {}
         this.query = Object.fromEntries(new URLSearchParams(window.location.search))
         this.hash = window.location.hash
-        for (let route in this.routes) {
-            const result = path.match(this.routes[route])
+        for (let route in Router.routes) {
+            const result = path.match(Router.routes[route])
             if (result && result.shift() === path) {
                 this.name = route
                 this.params = result.groups || {}
-                return
+                break
             }
         }
+        cb && cb()
     }
 }
 

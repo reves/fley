@@ -29,6 +29,10 @@ plugins: [
 ```
 ## Usage
 ```javascript
+ley('Hello, World!')
+ley('Hello, World!', document.body)
+```
+```javascript
 import ley, { useState } from 'ley'
 
 function App() {
@@ -142,48 +146,54 @@ ley(<App/>)
 ```
 
 ## Router
+- name
+- path
+- params
+- query
+- hash
+- redirectedFrom
+- [define()](#routerdefine)
+- [go()](#routergo)
 
-- [router.define()](#routerdefine)
-- [router.go()](#routergo)
 ```javascript
+import ley, { useStore } from 'ley'
 import router from 'ley/router'
-import Home from 'Home'
-import About from 'About'
 
 router.define({
 	home: /\/$/i,
-	about: /\/about/i
+	about: /\/about/i,
 })
 
 function App() {
     useStore(router)
+
+    const page = router.name === 'home'
+        ? 'Home Page'
+        : (router.name === 'about'
+            ? 'About Us'
+            : 'Page Not Found')
+
     return <>
-        <nav>
-            <a href="/">Home</a>|
-            <a href="/about">About Us</a>
-        </nav>
-        <div>
-            { router.name === 'home'
-                ? <Home />
-                : router.name === 'about'
-                    ? <About />
-                    : 'Page not found'
-            }
-        </div>
+        <a href="/">Home</a> | <a href="/about">About</a>
+        <h1>{page}</h1>
     </>
 }
+
+ley(<App/>)
 ```
 ### router.define()
-Defines named routes.
+Defines named routes using regular expressions, especially [named groups](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Groups_and_Ranges#using_named_groups) for dynamic params.
 ```javascript
 router.define({
-	home: /\/$/i, // name: new RegExp()
+	home: /\/$/i,
+	user: /\/user\/(?<username>.*)$/i, // route.params.username
 })
 ```
 ### router.go()
 Navigates programmatically.
 ```javascript
 router.go('/about')
+router.go('/about', () => window.scrollTo(0, 0))
 ```
 ## I18n
 ```javascript
