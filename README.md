@@ -2,12 +2,31 @@
 
 Frontend JavaScript web framework based on [JSX syntax](https://github.com/facebook/jsx) and concurrent renderer with [Fiber Architecture](https://github.com/acdlite/react-fiber-architecture).
 
+- [Quick Start](#quick-start)
+- [Usage](#usage)
 - [Hooks](#hooks)
 - [Store (global states)](#store)
 - [Router](#router)
 - [I18n](#i18n)
-- HTTP API Client
+- API Client
 
+## Quick Start
+#### 1. Install the required development packages
+```
+npm install --save-dev @babel/core @babel/plugin-transform-react-jsx
+```
+#### 2. Set up the [Babel JSX transform plugin](https://babeljs.io/docs/en/babel-plugin-transform-react-jsx#usage)
+```javascript
+plugins: [
+    [
+        '@babel/plugin-transform-react-jsx',
+        {
+            runtime: 'automatic',
+            importSource: 'ley'
+        }
+    ],
+]
+```
 ## Usage
 ```javascript
 import ley, { useState } from 'ley'
@@ -73,14 +92,15 @@ function Component() {
 ```
 
 ## Store
-- [createStore](#createstore)
-
 A store is an object that contains a global state (properties) and its actions (methods).
+
 ### createStore
 ```javascript
 createStore(Class)
 ```
 ```javascript
+import ley, { createStore, useStore } from 'ley'
+
 class ThemeStore
 {
     static styles = ['light', 'dark']
@@ -110,13 +130,15 @@ class ThemeStore
 
 const theme = createStore(ThemeStore)
 
-function Component() {
+function App() {
     useStore(theme)
     return <>
         <div>The current theme style is {theme.style}</div>
         <button onClick={() => theme.toggleStyle()}>Change theme style</button>
     </>
 }
+
+ley(<App/>)
 ```
 
 ## Router
