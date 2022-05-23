@@ -1,37 +1,24 @@
 import { getCookie } from './utils'
 import { createStore } from './ui/hooks'
 
-/**
- * Language Plural Rules:
- * https://unicode-org.github.io/cldr-staging/charts/39/supplemental/language_plural_rules.html
- * http://docs.translatehouse.org/projects/localization-guide/en/latest/l10n/pluralforms.html?id=l10n/pluralforms
- * 
- * DateTime formatting:
- * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat
- * 
- * Number formatting:
- * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat
- */
-
 class I18n {
 
     static locales = {}
+    static fallbackLocale = {}
 
     constructor() {
         this.code = ''
         this.locale = {}
-        this.fallback = {}
-        this.pluralRule = null
+        this.plural = null
     }
 
-    define(newLocales) {
-        this.locales = newLocales
+    define(locales = {}) {
+        I18n.locales = locales
 
-        // Fallback locale will be the first one defined in the locales object
+        // The fallback locale will be the first defined in the locales object
         let fallbackCode = ''
-
-        for (const key in this.locales) {
-            this.fallback = this.locales[key]
+        for (const key in locales) {
+            I18n.fallbackLocale = locales[key]
             fallbackCode = key
             break
         }
@@ -48,117 +35,103 @@ class I18n {
 
     setLocale(code) {
         if (this.code === code) return null
-        if (!this.locales.hasOwnProperty(code)) return null
+        if (!I18n.locales.hasOwnProperty(code)) return null
         document.cookie = 'lang=' + code + ';path=/;max-age=31536000;secure;samesite=Lax'
         this.code = code
-        this.locale = this.locales[code]
-        this.pluralRule = this.locale.$?.pluralRule ?? (n => n == 1 ? 0 : 1)
+        this.locale = I18n.locales[code]
+        this.plural = this.locale.$?.plural ?? (n => n == 1 ? 0 : 1)
         return true
-    }
-
-    static getLocales() {
-        const locales = {}
-        for (const key in this.locales) {
-            locales[key] = this.locales[key].$?.name ?? ''
-        }
-        return locales
-    }
-
-    static t(key, substitute = null) {
-        const prefix = key.replace(/\.[^\.]*$/, '')
-        const keyDefault = prefix ? prefix + '._' : '_'
-
-        let value = I18n.getValue(key, this.locale) ||
-                    I18n.getValue(keyDefault, this.locale) ||
-                    I18n.getValue(key, this.fallback) || 
-                    I18n.getValue(keyDefault, this.fallback)
-
-        if (value == null) return ''
-
-        // Resolve references
-        value = value.replace(
-            /\@\{([^\}]*)\}/g,
-            (_, $1) => $1.charAt(0) === '.' ? I18n.t.call(this, prefix + $1) : I18n.t.call(this, $1)
-        )
-
-        return I18n.interpolate.call(this, value, substitute)
-    }
-
-    static getValue(key, object) {
-        return key ? key.split('.').reduce((o, i) => o[i], object) : null
-    }
-
-    /**
-     * Usage cases
-     * ---------------
-     * refference1: '@{key.otherKey}',
-     * refference2: '@{.sameParentKey}',
-     * number1: '{n:format}',
-     * number2: '{n} (book | books)',
-     * number3: '(a book | {n:format} books)',
-     * number4: '(a book | many books)',
-     * string: '{s}',
-     * boolean: 'My answer is {b: yes || no}',
-     * date: 'Published on {d:format}',
-     * array: '{0}, {1} and {2}',
-     * object1: '{a}, {b:format} and {c.x.y}',
-     * object2: 'We bought {a} and {b} (book | books) at the price of {c.x.y:format}',
-     */
-    static interpolate(template, sub, tag) {
-        if (!template) return ''
-        if (sub == null) return template
-
-        switch (typeof sub) {
-            case 'number':
-                return template.replace(
-                    new RegExp(
-                        '\\{' + (tag ?? 'n') + 
-                        '(?:\\:([^\\}]+))?\\}(?:\\s*\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'
-                    ), (_, $1, $2, $3) => $3
-                        ? I18n.interpolate.call(this, $3.split('|')[this.pluralRule(Math.abs(sub))]?.trim(), sub)
-                        : (($1
-                            ? new Intl.NumberFormat(this.code, this.locale.$?.numberFormats?.[$1]).format(sub)
-                            : sub) + ' ' + ($2
-                            ? I18n.interpolate.call(this, $2.split('|')[this.pluralRule(Math.abs(sub))]?.trim(), sub)
-                            : ''
-                        ))
-                )
-
-            case 'string':
-                return template.replace(new RegExp('\\{' + (tag ?? 's') + '\\}', 'g'), sub)
-
-            case 'boolean':
-                return template.replace(
-                    new RegExp('\\{' + (tag ?? 'b') + '\\:([^\\}]*)\\|\\|([^\\}]*)\\}', 'g'),
-                    (_, $1, $2) => sub ? $1.trim() : $2.trim()
-                )
-
-            case 'object':
-                break
-
-            default:
-                return template
-        }
-
-        if (sub instanceof Date) return template.replace(
-            new RegExp('\\{' + (tag ?? 'd') + '(?:\\:([^\\}]+))?\\}', 'g'),
-            (_, $1) => new Intl.DateTimeFormat(this.code, $1 ? this.locale.$?.dateTimeFormats?.[$1] : {}).format(sub)
-        )
-
-        if (sub instanceof Array) {
-            sub.forEach((s, i) => template = I18n.interpolate.call(this, template, s, i))
-            return template
-        }
-
-        for (const k in sub) {
-            template = I18n.interpolate.call(this, template, sub[k], (tag != null ? tag + '.' + k : k))
-        }
-        return template
     }
 }
 
 const i18n = createStore(I18n)
 
-export const t = I18n.t.bind(i18n)
-export const getLocales = I18n.getLocales.bind(i18n)
+export function t(key, substitute = null) {
+    const prefix = key.replace(/\.?[^\.]*$/, '')
+    const fallbackKey = prefix ? prefix + '._' : '_'
+    let value = getValue(key, i18n.locale) ||
+                getValue(fallbackKey, i18n.locale) ||
+                getValue(key, I18n.fallbackLocale) || 
+                getValue(fallbackKey, I18n.fallbackLocale)
+    if (!value) return ''
+    return interpolate(
+        value.replace( // resolve references
+            /\@\{([^\}]*)\}/g,
+            (_, $1) => $1.charAt(0) === '.' ? t(prefix + $1) : t($1)
+        ),
+        substitute
+    )
+}
+
+function getValue(path, object) {
+    return path 
+        ? path.split('.').reduce((o, k) => o[k] ?? '', object)
+        : null
+}
+
+function interpolate(template, substitute, tag) {
+    if (!template) return ''
+    if (substitute == null) return template
+
+    const type = typeof substitute
+    let regExp, replacer
+
+    switch (true) {
+        case type === 'string':
+            regExp = new RegExp('\\{' + (tag ?? 's') + '\\}', 'g')
+            replacer = substitute
+            break
+
+        case type === 'boolean':
+            regExp = new RegExp('\\{' + (tag ?? 'b') + '\\:([^\\}]*)\\|\\|([^\\}]*)\\}', 'g')
+            replacer = (_, $1, $2) => substitute ? $1.trim() : $2.trim()
+            break
+
+        case type === 'number':
+            regExp = new RegExp('\\{' + (tag ?? 'n')
+                + '(?:\\:([^\\}]+))?\\}(?:\\s*\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'
+            )
+            replacer = (_, $1, $2, $3) => $3
+                ? interpolate($3.split('|')[i18n.plural(Math.abs(substitute))]?.trim(), substitute)
+                : (
+                    ($1
+                        ? new Intl.NumberFormat(i18n.code, i18n.locale.$?.formats?.number?.[$1]).format(substitute)
+                        : substitute
+                    ) + ($2
+                        ? (' ' + interpolate($2.split('|')[i18n.plural(Math.abs(substitute))]?.trim(), substitute))
+                        : ''
+                    )
+                )
+            break
+
+        case substitute instanceof Date:
+            regExp = new RegExp('\\{' + (tag ?? 'dt') + '(?:\\:([^\\}]+))?\\}', 'g')
+            replacer = (_, $1) => new Intl.DateTimeFormat(
+                    i18n.code,
+                    $1 ? i18n.locale.$?.formats?.dateTime?.[$1] : {}
+                ).format(substitute)
+            break
+
+        case Array.isArray(substitute):
+            substitute.forEach((s, i) => template = interpolate(template, s, i))
+            break
+
+        case type === 'object':
+            for (const k in substitute) template = interpolate(
+                template,
+                substitute[k],
+                tag == null ? k : (tag + '.' + k)
+            )
+            break
+    }
+
+    return regExp
+        ? template.replace(regExp, replacer)
+        : template
+}
+
+export function getLocales() {
+    return Object.keys(I18n.locales).map(code => I18n.locales[code].$?.name ?? '')
+}
+
 export default i18n

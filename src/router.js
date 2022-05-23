@@ -3,6 +3,7 @@ import { createStore } from './ui/hooks'
 /**
  * TODO:
  * - actions: change title, meta tags
+ * - close, when going back (e.g. close modal window)
  */
 
 class Router {
