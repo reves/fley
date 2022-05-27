@@ -1,9 +1,9 @@
 {
     "name": "ley",
-    "version": "1.0.0",
-    "description": "Frontend JavaScript web framework based on JSX syntax",
+    "version": "0.1.0",
+    "description": "Frontend JavaScript web framework based on JSX syntax and concurrent renderer with Fiber Architecture",
     "keywords": [
-        "ley", "frontend", "framework", "jsx", "ui-library"
+        "ley", "i18n", "hooks", "router", "reconciliation", "jsx", "concurrency", "frontend", "framework", "fiber", "ui-library", "global-store"
     ],
     "browser": "./src/ley.js",
     "exports": {

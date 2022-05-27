@@ -4,7 +4,7 @@ import { update } from './ui/renderer'
 
 export default function ley(children, root = document.body) {
     root.innerHTML = ''
-    update( new Fiber( new Element(null, { children }), document.body) )
+    update( new Fiber( new Element(null, { children }), root) )
 }
 
 export {
