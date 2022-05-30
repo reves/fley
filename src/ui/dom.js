@@ -41,11 +41,10 @@ export function updateNode(fiber) {
         return node
     }
     const prevProps = fiber.alt?.props ?? {}
-    const reserved = (prop) => prop === 'children' || prop === 'html'
 
     // Obsolete props
     for (const prop in prevProps) {
-        if (reserved(prop)) continue
+        if (isReserved(prop)) continue
 
         // Unset Ref
         if (prop === 'ref') {
@@ -68,7 +67,7 @@ export function updateNode(fiber) {
 
     // Updated props
     for (const prop in nextProps) {
-        if (reserved(prop)) continue
+        if (isReserved(prop)) continue
 
         // Ref
         if (prop === 'ref') {
@@ -101,4 +100,8 @@ export function updateNode(fiber) {
     }
 
     return node
+}
+
+function isReserved(prop) {
+    return prop === 'children' || prop === 'html'
 }

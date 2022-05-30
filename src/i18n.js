@@ -37,6 +37,7 @@ class I18n {
         if (this.code === code) return null
         if (!I18n.locales.hasOwnProperty(code)) return null
         document.cookie = 'lang=' + code + ';path=/;max-age=31536000;secure;samesite=Lax'
+        document.documentElement.setAttribute('lang', code)
         this.code = code
         this.locale = I18n.locales[code]
         this.plural = this.locale.$?.plural ?? (n => n == 1 ? 0 : 1)

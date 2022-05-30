@@ -158,14 +158,15 @@ ley(<App/>)
 ```
 
 ## Router
-- router.name
-- router.path
-- router.params
-- router.query
-- router.hash
-- router.redirectedFrom
+- router.name - The name of the route that matches the current path.
+- router.path - The current path.
+- router.params - Dynamic params (regExp named capturing groups).
+- router.query - Query parameters from the current URL.
+- router.hash - The fragment from the current URL (including `#`).
+- router.from - The name of the previous route.
 - [router.define()](#routerdefine)
 - [router.go()](#routergo)
+- [Metadata](#metadata)
 
 ```javascript
 import ley, { useStore } from 'ley'
@@ -207,10 +208,72 @@ Navigates programmatically.
 router.go('/about')
 router.go('/about', () => window.scrollTo(0, 0))
 ```
+
+### Metadata
+Managing metadata in the `<head>` section.
+```javascript
+import { setTitle, setMeta, setSchema } from 'ley/router'
+
+// These functions run as side effects and therefore do not change the state of 
+// the router (no re-rendering).
+```
+
+#### Title
+Updates the document title.
+```javascript
+setTitle("Home Page")
+```
+```html
+<head>
+    <!-- ... -->
+    <title>Home Page</title>
+</head>
+```
+
+#### Meta tags
+Adds meta tags. On subsequent calls, removes all previously added tags before adding new ones.
+```javascript
+setMeta([
+    { name: "description", content: "Book description." },
+    { property: "og:title", content: "Book Title" },
+])
+```
+```html
+<head>
+    <!-- ... -->
+    <meta name="description" content="Book description.">
+    <meta property="og:title" content="Book Title">
+</head>
+```
+
+#### Schema
+Updates the structured data.
+```javascript
+setSchema({
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "name": "Book Title",
+    "description": "Book description.",
+})
+```
+```html
+<head>
+    <!-- ... -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org/",
+            "@type": "Book",
+            "name": "Book Title",
+            "description": "Book description."
+        }
+    </script>
+</head>
+```
+
 ## I18n
-- i18n.code
-- i18n.locale
-- i18n.pluralRule
+- i18n.code - The current language code.
+- i18n.locale - Reference to the current locale object.
+- i18n.plural - Reference to the current locale plural rule (function).
 - [i18n.define()](#i18ndefine)
 - [i18n.setLocale()](#i18nsetlocale)
 - [Configuration](#configuration)
@@ -265,32 +328,36 @@ i18n.setLocale('en')
 ```
 
 ### Configuration
-See the [List of plural rules](https://docs.translatehouse.org/projects/localization-guide/en/latest/l10n/pluralforms.html), or learn more about [Language Plural Rules](https://unicode-org.github.io/cldr-staging/charts/39/supplemental/language_plural_rules.html).
+The configuration object must be assigned to the reserved property `$` of the locale object.
+
+The required plural rule can be found in the [List of plural rules](https://docs.translatehouse.org/projects/localization-guide/en/latest/l10n/pluralforms.html). Learn more about [Language Plural Rules](https://unicode-org.github.io/cldr-staging/charts/39/supplemental/language_plural_rules.html).
 ```javascript
 const ro = {
 
     // Config
     $: {
+        
         // Locale display name.
-        // default: ''
+        // Default value: ''
         name: 'Română',
         
-        // Pluralization rule.
-        // default: rule of the english language
+        // Pluralization rule (function).
+        // By default will be used the rule of the english language.
         plural: n => n==1 ? 0 : (n==0 || (n%100>0 && n%100<20) ? 1 : 2),
 
-        // Lists of named formatting options for Intl API constructors.
+        // Defined formatting options for Intl API constructors.
         formats: {
-            // Named options for date and time formatting.
-            // default: Intl.DateTimeFormat() default options
+
+            // Defined options for date and time formatting.
+            // Will be used as the second argument for Intl.DateTimeFormat()
             dateTime: {
-                
-                comment: {
+
+                "comment": {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric'
                 },
-                post: {
+                "post": {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
@@ -300,11 +367,12 @@ const ro = {
                 }
 
             },
-            // Named options for number formatting.
-            // default: Intl.NumberFormat() default options
+
+            // Defined options for number formatting.
+            // Will be used as the second argument for Intl.NumberFormat()
             number: {
 
-                price: {
+                "price": {
                     style: 'currency',
                     currency: 'EUR',
                     currencyDisplay: 'symbol'
@@ -321,7 +389,7 @@ const ro = {
 
 ### Formatting
 
-#### Reference
+#### Reference `@{ [keyA.keyB] }`, `@{ [.key] }`
 ```javascript
 const en = {   
     message: { hello: 'Hello' },
@@ -335,7 +403,7 @@ const en = {
 t('main.title') // Hello, World! How are you today?
 ```
 
-#### String
+#### String `{s}`
 ```javascript
 const en = { message: 'Hello, {s}!' }
 ```
@@ -343,7 +411,7 @@ const en = { message: 'Hello, {s}!' }
 t('message', 'World') // Hello, World!
 ```
 
-#### Boolean
+#### Boolean `{b: [==true] || [==false] }`
 ```javascript
 const en = { message: 'My answer is {b: yes || no}' }
 ```
@@ -352,14 +420,15 @@ t('message', true) // My answer is yes
 t('message', false) // My answer is no
 ```
 
-#### Number
+#### Number `{n}`, `{n: [format] }`, `( [plural==0] | [plural==1] | ... )`
 See [Number formatting](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat) options.
 ```javascript
 const en = {
+    // Config
     $: {
         formats: {
             number: {
-                price: {
+                "price": {
                     style: 'currency',
                     currency: 'USD',
                     currencyDisplay: 'symbol'
@@ -367,8 +436,8 @@ const en = {
             }
         }
     },
-
-    buy: 'Buy now for {n:price}!', // using a format
+    // Translations
+    buy: 'Buy now for {n:price}!', // using the defined formatting options "price"
     add: 'Add (a book | {n} books) to your shopping cart.',
     cart: 'You have {n} (book | books) in your shopping cart.',
     category: 'We have (one book | many books) in this category.',
@@ -382,7 +451,7 @@ t('cart', 3)        // You have 3 books in your shopping cart.
 t('category', 1)    // We have one book in this category.
 ```
 
-#### DateTime
+#### DateTime `{dt}`, `{dt: [format] }`
 See [DateTime formatting](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat) options.
 ```javascript
 const en = { message: 'Published on {dt:comment}' }
@@ -391,7 +460,7 @@ const en = { message: 'Published on {dt:comment}' }
 t('message', new Date('Dec 31, 2000')) // Published on 12/31/2000
 ```
 
-#### Array
+#### Array elements `{ [index] }`
 ```javascript
 const en = { message: 'Comparison of {0} and {1} at a price of {2:price}' }
 ```
@@ -399,7 +468,8 @@ const en = { message: 'Comparison of {0} and {1} at a price of {2:price}' }
 t('message', ['A', 'B']) // Comparison of A and B at a price of $9.99
 ```
 
-#### Object
+#### Object properties `{ [name] }`, `{ [nameA.nameB] }`
+For each property, its type is automatically determined, so the formatting rules described above can be applied.
 ```javascript
 const en = { message: 'We bought {a} and {b} (book | books) at the price of {c.x.y:price}' }
 ```

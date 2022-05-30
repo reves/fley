@@ -1,11 +1,5 @@
 import { createStore } from './ui/hooks'
 
-/**
- * TODO:
- * - actions: change title, meta tags
- * - close, when going back (e.g. close modal window)
- */
-
 class Router {
 
     static routes = {}
@@ -16,7 +10,7 @@ class Router {
         this.params = {}
         this.query = {}
         this.hash = ''
-        this.redirectedFrom = ''
+        this.from = ''
     }
 
     define(routes = {}) {
@@ -29,7 +23,7 @@ class Router {
         if (path !== window.location.pathname){
             window.history.pushState({}, '', path)
         }
-        this.redirectedFrom = this.name
+        this.from = this.name
         this.name = ''
         this.path = path
         this.params = {}
@@ -48,6 +42,39 @@ class Router {
 }
 
 const router = createStore(Router)
+
+export function setTitle(title = '') {
+    document.title = title
+}
+
+const metaNodes = []
+
+export function setMeta(meta = []) {
+    metaNodes.forEach(node => document.head.removeChild(node))
+    metaNodes.length = 0
+    if (!meta.length) return
+    const fragment = document.createDocumentFragment()
+    meta.forEach(props => {
+        const node = document.createElement('meta')
+        for (const prop in props) node.setAttribute(prop, props[prop])
+        metaNodes.push(node)
+        fragment.appendChild(node)
+    })
+    document.head.appendChild(fragment)
+}
+
+let schemaNode = null
+
+export function setSchema(schema = '') {
+    if (!schemaNode) {
+        schemaNode = document.createElement('script')
+        schemaNode.type = 'application/ld+json'
+        document.head.appendChild(schemaNode)
+    }
+    schemaNode.text = typeof schema === 'object'
+        ? JSON.stringify(schema)
+        : schema
+}
 
 // Set the initial window history state
 try { window.history.replaceState({}, '', window.location.href) } catch(error) {}
