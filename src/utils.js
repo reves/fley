@@ -1,4 +1,5 @@
 export function getCookie(name) {
+    if (!name) return ''
     return document.cookie.replace(
         new RegExp('(?:(?:^|.*; *)' + name + '=([^;]*).*$)|^.*$'), '$1'
     )

@@ -8,7 +8,7 @@ Frontend JavaScript web framework based on [JSX syntax](https://github.com/faceb
 - [Store (global states)](#store)
 - [Router](#router)
 - [I18n](#i18n)
-- API Client
+- [API Client](#api-client)
 
 ## Quick Start
 #### 1. Install the required development packages
@@ -476,4 +476,123 @@ const en = { message: 'We bought {a} and {b} (book | books) at the price of {c.x
 ```javascript
 t('message', { a: 'a pencil', b: 10, c: { x: { y: 49.99 } } })
 // We bought a pencil and 10 books at the price of $49.99
+```
+
+## API Client
+- [api.init()](#apiinit)
+- [api.get()](#apiget)
+- [api.post()](#apipost)
+- [api.request()](#apirequest)
+- [Instance](#instance)
+- [Events](#events)
+- [Cancellation](#cancellation)
+
+
+```javascript
+import api from 'ley/api'
+
+api.init({ baseURL: 'https://api.example.com'})
+
+api.get('/books?id=1')
+    .success((response, status, event) => {
+        console.log(response.title)
+        console.log(response.author)
+    })
+    .fail((response, status, event) => {
+        console.log("Couldn't find the book.")
+    })
+    .error((response, status, event) => {
+        console.log("An error occured. Please try again later.")
+    })
+```
+
+#### api.init()
+Updates the current request settings.
+```javascript
+api.init({
+    // Endpoint prefix
+    // Default: ''
+    baseURL: 'https://api.example.com',
+
+    // Response data type.
+    // Default: 'json'
+    responseType: 'json',
+
+    // Name of the cookie containing the CSRF token.
+    // The cookie value will be set in the "X-CSRF-Token" request header for all
+    // the POST requests.
+    // Default: ''
+    CSRFCookie: 'csrftoken',
+
+    // Custom request headers.
+    // Default: {}
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+
+    // Request timeout in milliseconds.
+    // Default: 5000
+    timeout: 5000
+})
+```
+
+#### api.get()
+```javascript
+api.get('/books?id=1')
+api.get('/books', { id: 1 })
+```
+
+#### api.post()
+```javascript
+api.post('/books', {
+    title: "Book title",
+    description: "Description",
+    author: "Author",
+    cover: fileInputElement.files[0]
+})
+```
+
+#### api.request()
+```javascript
+api.request('POST', '/books', { title: "The title" })
+```
+
+### Instance
+```javascript
+import { Api } from 'ley/api'
+
+const api = new Api({
+    responseType: 'document'
+    // ...
+})
+```
+
+### Events
+```javascript
+api.get('/endpoint')
+    .progress((event) => {
+        // XMLHttpRequest progress event
+    })
+    .success((response, status, event) => {
+        // XMLHttpRequest load event
+        // status 2xx
+    })
+    .fail((response, status, event) => {
+        // XMLHttpRequest load event
+        // status 4xx
+    })
+    .error((response, status, event) => {
+        // XMLHttpRequest error/timeout/abort event
+        // status != 2xx && status != 4xx
+    })
+    .always((response, status, event) => {
+        // XMLHttpRequest loadend event
+        // Fired even after abort.
+    })
+```
+
+### Cancellation
+```javascript
+const handler = api.get('/books?id=1')
+
+// Something happened ...
+handler.abort()
 ```

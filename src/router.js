@@ -23,12 +23,11 @@ class Router {
         if (path !== window.location.pathname){
             window.history.pushState({}, '', path)
         }
+        this.path = path
+        this.hash = window.location.hash
         this.from = this.name
         this.name = ''
-        this.path = path
         this.params = {}
-        this.query = Object.fromEntries(new URLSearchParams(window.location.search))
-        this.hash = window.location.hash
         for (let route in Router.routes) {
             const result = path.match(Router.routes[route])
             if (result && result.shift() === path) {
@@ -37,6 +36,16 @@ class Router {
                 break
             }
         }
+        this.query = window.location.search
+            ? window.location.search.slice(1).split('&')
+                .reduce((params, param) => {
+                    const [key, value] = param.split('=')
+                    params[key] = value
+                        ? decodeURIComponent(value.replace(/\+/g, ' '))
+                        : '';
+                    return params
+                }, {})
+            : {}
         cb && cb()
     }
 }
