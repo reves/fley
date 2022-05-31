@@ -2,7 +2,7 @@
 
 Frontend JavaScript web framework based on [JSX syntax](https://github.com/facebook/jsx) and concurrent renderer with [Fiber Architecture](https://github.com/acdlite/react-fiber-architecture).
 
-- [Quick Start](#quick-start)
+- [Installation](#installation)
 - [Usage](#usage)
 - [Hooks](#hooks)
 - [Store (global states)](#store)
@@ -10,12 +10,16 @@ Frontend JavaScript web framework based on [JSX syntax](https://github.com/faceb
 - [I18n](#i18n)
 - [API Client](#api-client)
 
-## Quick Start
-#### 1. Install the required development packages
+## Installation
+```properties
+npm install reves/ley
 ```
-npm install --save-dev @babel/core @babel/plugin-transform-react-jsx
+
+#### Required development packages
+```properties
+npm install -D @babel/core @babel/plugin-transform-react-jsx
 ```
-#### 2. Set up the [Babel JSX transform plugin](https://babeljs.io/docs/en/babel-plugin-transform-react-jsx#usage)
+#### Set up the [Babel JSX transform plugin](https://babeljs.io/docs/en/babel-plugin-transform-react-jsx#usage)
 ```javascript
 plugins: [
     [
