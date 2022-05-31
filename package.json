@@ -1,5 +1,5 @@
 {
-    "name": "ley",
+    "name": "@reves/ley",
     "version": "1.0.0",
     "description": "Frontend JavaScript web framework based on JSX syntax and concurrent renderer with Fiber Architecture",
     "keywords": [

@@ -11,13 +11,13 @@ Frontend JavaScript web framework based on [JSX syntax](https://github.com/faceb
 - [API Client](#api-client)
 
 ## Installation
-```properties
-npm install reves/ley
+```console
+npm i ley@npm:@reves/ley
 ```
 
 #### Required development packages
-```properties
-npm install -D @babel/core @babel/plugin-transform-react-jsx
+```console
+npm i -D @babel/core @babel/plugin-transform-react-jsx
 ```
 #### Set up the [Babel JSX transform plugin](https://babeljs.io/docs/en/babel-plugin-transform-react-jsx#usage)
 ```javascript
