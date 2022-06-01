@@ -584,12 +584,12 @@ api.get('/endpoint')
         // status 4xx
     })
     .error((response, status, event) => {
-        // XMLHttpRequest error/timeout/abort event
+        // XMLHttpRequest error/timeout event
         // status != 2xx && status != 4xx
     })
     .always((response, status, event) => {
         // XMLHttpRequest loadend event
-        // Fired even after abort.
+        // Fires even after abort.
     })
 ```
 
