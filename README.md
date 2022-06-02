@@ -112,7 +112,10 @@ function Component() {
 ```
 
 ## Store
-A store is an object that contains a global state (properties) and its actions (methods).
+A ___store___ is an object that contains a ___global state___ (properties) and ___actions___ (non-static methods).
+
+- [createStore](#createstore)
+- [Asynchronous actions](#asynchronous-actions)
 
 ### createStore
 ```javascript
@@ -120,6 +123,7 @@ const store = createStore(Class)
 ```
 ```javascript
 import ley, { createStore, useStore } from 'ley'
+import api from 'ley/api'
 
 class ThemeStore
 {
@@ -132,8 +136,8 @@ class ThemeStore
 
     toggleStyle()
     {
-        // Calls to other actions do not cause additional rendering.
-        // Returning "null" prevents rendering.
+        // 1) Inner calls to other actions do not cause additional rendering.
+        // 2) Returning "null" from the most outer action prevents rendering.
         return this.style === 'light'
             ? this.setStyle('dark')
             : this.setStyle('light')
@@ -159,6 +163,33 @@ function App() {
 }
 
 ley(<App/>)
+```
+
+### Asynchronous actions
+The reserved method `this.action(callback)` performs manual dispatch.
+```javascript
+class UsersStore
+{
+    constructor()
+    {
+        this.users = []
+        this.total = 0
+    }
+    
+    fetchUsers() {
+        api.get('/users').success((res) => {
+            this.action(() => {
+                this.users = res.list
+                this.total = res.total
+            })
+            // Or
+            // this.users = res.list
+            // this.total = res.total
+            // this.action() // commit state
+        })
+        return null // prevent rendering
+    }
+}
 ```
 
 ## Router

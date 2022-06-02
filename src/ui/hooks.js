@@ -75,6 +75,10 @@ export function createStore(Class) {
             return !depth ? this : result
         }
     })
+    Class.prototype.action = (cb) => {
+        cb && cb()
+        watchers.forEach(update)
+    }
     const store = new Class
     storesWatchers.set(store, watchers)
     return store
