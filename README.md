@@ -373,11 +373,11 @@ const ro = {
     $: {
         
         // Locale display name.
-        // Default value: ''
+        // Default: ''
         name: 'Română',
         
         // Pluralization rule (function).
-        // By default will be used the rule of the english language.
+        // Default: n => n == 1 ? 0 : 1
         plural: n => n==1 ? 0 : (n==0 || (n%100>0 && n%100<20) ? 1 : 2),
 
         // Defined formatting options for Intl API constructors.
@@ -500,7 +500,7 @@ t('message', new Date('Dec 31, 2000')) // Published on 12/31/2000
 const en = { message: 'Comparison of {0} and {1} at a price of {2:price}' }
 ```
 ```javascript
-t('message', ['A', 'B']) // Comparison of A and B at a price of $9.99
+t('message', ['A', 'B', 9.99]) // Comparison of A and B at a price of $9.99
 ```
 
 #### Object properties `{ [name] }`, `{ [nameA.nameB] }`
@@ -542,7 +542,7 @@ api.get('/books?id=1')
 ```
 
 #### api.init()
-Updates the current request settings.
+Updates the current settings of request.
 ```javascript
 api.init({
     // Endpoint prefix
@@ -587,7 +587,11 @@ api.post('/books', {
 
 #### api.request()
 ```javascript
-api.request('POST', '/books', { title: "The title" })
+const method = 'PUT'
+const endpoint = '/books'
+const body = JSON.stringify({ title: "The title" })
+
+api.request(method, endpoint, body)
 ```
 
 ### Instance
@@ -620,7 +624,7 @@ api.get('/endpoint')
     })
     .always((response, status, event) => {
         // XMLHttpRequest loadend event
-        // Fires even after abort.
+        // (this event fires even after abort)
     })
 ```
 

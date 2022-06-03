@@ -30,7 +30,7 @@ export class Api {
         return this.request('POST', endpoint, form)
     }
 
-    request(method, endpoint, data) {
+    request(method, endpoint, body) {
         const xhr = new XMLHttpRequest()
         xhr.open(method, this.baseURL + endpoint, true)
         xhr.responseType = this.responseType
@@ -39,7 +39,7 @@ export class Api {
         if (method === 'POST' && this.CSRFCookie) {
             xhr.setRequestHeader("X-CSRF-Token", getCookie(this.CSRFCookie))
         }
-        xhr.send(data)
+        xhr.send(body)
         return new XHRHandler(xhr)
     }
 }
