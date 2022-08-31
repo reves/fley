@@ -32,9 +32,10 @@ plugins: [
 ]
 ```
 ## Usage
+- [Inline HTML](#inline-html)
 ```javascript
 ley('Hello, World!') // By default, uses document.body as the root element.
-ley('Hello, World!', document.getElementById('root'))
+ley('Hello, World!', document.getElementById('app'))
 ```
 ```javascript
 import ley, { useState } from 'ley'
@@ -50,16 +51,28 @@ function App() {
 ley(<App/>)
 ```
 #### Inline HTML
+
 ```javascript
 import ley, { Inline } from 'ley'
-import icon from './icon.svg' // e.g. using Webpack asset/source
+import icon from './icon.svg' // e.g. import with Webpack asset/source
 
-ley(
-    <>
-        <Inline html="<b>The icon:</b> " />
-        <Inline html={icon} />
-    </>
-)
+ley(<>
+    <Inline html={icon} width="16px" key="[unique-key-to-reuse-node]" />
+    <Inline html="<ul> <li>One</li> <li>Two</li> </ul>" style="color: green;" />
+    <Inline html="<p>The first outer element is rendered</p> <p>This is omitted</p>" />
+    <Inline html="Plain text" />
+</>)
+```
+```html
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="16px">
+    <circle cx="50" cy="50" r="50"></circle>
+</svg>
+<ul style="color: green;">
+    <li>One</li>
+    <li>Two</li>
+</ul>
+<p>The first outer element is rendered</p>
+Plain text
 ```
 
 ## Hooks
@@ -125,7 +138,7 @@ const store = createStore(Class)
 import ley, { createStore, useStore } from 'ley'
 import api from 'ley/api'
 
-class ThemeStore
+class Theme
 {
     static styles = ['light', 'dark']
 
@@ -145,14 +158,14 @@ class ThemeStore
 
     setStyle(style)
     {
-        if (!ThemeStore.styles.includes(style)) {
+        if (!Theme.styles.includes(style)) {
             return null
         }
         this.style = style
     }
 }
 
-const theme = createStore(ThemeStore)
+const theme = createStore(Theme)
 
 function App() {
     useStore(theme)
@@ -166,28 +179,25 @@ ley(<App/>)
 ```
 
 ### Asynchronous actions
-The reserved method `this.action(callback)` performs manual dispatch.
+The reserved method `this.action([callback])` performs manual dispatch.
 ```javascript
-class UsersStore
+class Users
 {
     constructor()
     {
         this.users = []
-        this.total = 0
     }
     
     fetchUsers() {
         api.get('/users').success((res) => {
-            this.action(() => {
-                this.users = res.list
-                this.total = res.total
-            })
-            // Or
-            // this.users = res.list
-            // this.total = res.total
-            // this.action() // commit state
+            this.users = res.list
+            this.action()
+            // Or use a callback:
+            // this.action(() => {
+            //    this.users = res.list
+            // })
         })
-        return null // prevent rendering
+        return null // prevent rendering right now
     }
 }
 ```
@@ -234,7 +244,7 @@ Defines named routes using regular expressions, especially [named groups](https:
 ```javascript
 router.define({
 	home: /\/$/i,
-	user: /\/user\/(?<username>.*)$/i, // route.params.username
+	user: /\/user\/(?<username>.*)$/i, // router.params.username
 })
 ```
 #### router.go()
@@ -311,6 +321,7 @@ setSchema({
 - i18n.plural - Reference to the current locale plural rule (function).
 - [i18n.define()](#i18ndefine)
 - [i18n.setLocale()](#i18nsetlocale)
+- [Locales list](#locales-list)
 - [Configuration](#configuration)
 - [Formatting](#formatting)
 ```javascript
@@ -357,13 +368,31 @@ t('common')     // :-)
 t('abc')     // Not yet translated
 ```
 #### i18n.setLocale()
-Sets the locale by the defined language code.
+Sets the locale by the __defined__ language code. Also updates the `lang` attribute of the `<html>` tag.
 ```javascript
 i18n.setLocale('en')
 ```
 
+### Locales list
+```javascript
+import i18n, { getLocales } from 'ley/i18n'
+
+i18n.define({
+    'en-US': { $: { name: "English" } },
+    'ro-RO': {}
+})
+
+console.log(getLocales())
+```
+```
+[
+    [ "en-US", "English" ],
+    [ "ro-RO", "" ] 
+]
+```
+
 ### Configuration
-The configuration object must be assigned to the reserved property `$` of the locale object.
+The config object must be assigned to the reserved property `$` of the locale object.
 
 The required plural rule can be found in the [List of plural rules](https://docs.translatehouse.org/projects/localization-guide/en/latest/l10n/pluralforms.html). Learn more about [Language Plural Rules](https://unicode-org.github.io/cldr-staging/charts/39/supplemental/language_plural_rules.html).
 ```javascript
@@ -624,7 +653,7 @@ api.get('/endpoint')
     })
     .always((response, status, event) => {
         // XMLHttpRequest loadend event
-        // (this event fires even after abort)
+        // (this event fires even after cancellation)
     })
 ```
 

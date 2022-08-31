@@ -1,4 +1,4 @@
-import { Text, Inline } from './Element'
+import { Text } from './Element'
 
 /**
  * TODO: SVG elements
@@ -7,30 +7,18 @@ import { Text, Inline } from './Element'
  */
 export function createNode(fiber) {
     if (fiber.node) return fiber.node
-
-    switch (true) {
-        case fiber.type === Text:
-            fiber.node = document.createTextNode(fiber.props.value)
-            return fiber.node
-
-        case fiber.type === Inline:
-            fiber.node = document.createElement('div')
-            fiber.node.innerHTML = fiber.props.html ?? ''
-            fiber.node = fiber.node.childNodes[0] ?? document.createTextNode('');
-            break
-
-        default:
-            fiber.node = document.createElement(fiber.type)
+    if (fiber.type === Text) {
+        fiber.node = document.createTextNode(fiber.props.value)
+        return fiber.node
     }
-
-    return fiber.node = updateNode(fiber)
+    fiber.node = fiber.props.html ?? document.createElement(fiber.type)
+    return updateNode(fiber)
 }
 
 /**
  * Applies JSX props to a DOM node.
  */
 export function updateNode(fiber) {
-
     const node = fiber.node
     const nextProps = fiber.props
 
@@ -40,6 +28,7 @@ export function updateNode(fiber) {
         }
         return node
     }
+
     const prevProps = fiber.alt?.props ?? {}
 
     // Obsolete props

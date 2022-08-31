@@ -50,6 +50,19 @@ export function normalize(children) {
             continue
         }
 
+        // Inline HTML
+        if (child.type === Inline) {
+            let node = document.createElement('div')
+            node.innerHTML = child.props.html ?? ''
+            node = node.childNodes[0] ?? document.createTextNode('')
+            if (node.nodeName === '#text') {
+                result.push(new Element(Text, {value: node.nodeValue}))
+                continue
+            }
+            child.type = Symbol(Inline)
+            child.props.html = node
+        }
+
         // Filter Elements that have duplicate keys
         if (child.key != null) {
             if (~keys.indexOf(child.key)) continue

@@ -132,7 +132,8 @@ function interpolate(template, substitute, tag) {
 }
 
 export function getLocales() {
-    return Object.keys(I18n.locales).map(code => I18n.locales[code].$?.name ?? '')
+    return Object.keys(I18n.locales)
+        .map(code => [code, I18n.locales[code].$?.name ?? ''])
 }
 
 export default i18n
