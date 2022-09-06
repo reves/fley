@@ -1,3 +1,5 @@
+import Hooks from "./Hooks"
+
 export const tag = {
     INSERT: 1,
     UPDATE: 2,
@@ -32,14 +34,6 @@ export function clone(alt, parent, pendingProps, tag, relation) {
     fiber.relation = relation
     fiber.hooks = alt.hooks
     return fiber
-}
-
-function Hooks(fiber) {
-    this.effects = []
-    this.states = []
-    this.stores = []
-    this.refs = []
-    this.fiber = fiber
 }
 
 export function clean(fiber) {

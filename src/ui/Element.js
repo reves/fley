@@ -1,12 +1,12 @@
 /**
- * Symbols for JSX element types
+ * JSX element types
  */
 export const Fragment = 'FRAGMENT'
 export const Inline = 'INLINE'
 export const Text = 'TEXT'
 
 /**
- * Creates a JSX element.
+ * JSX element
  */
 export default function Element(type, props, key) {
     if (props.hasOwnProperty('children')) {
@@ -20,13 +20,9 @@ export default function Element(type, props, key) {
 /**
  * Returns an Array of normalized children.
  */
-export function normalize(children) {
+export function normalize(children = [], result = [], keys = {}) {
 
-    const keys = []
-    const result = []
-
-    // Flatten nested arrays
-    children = Array.isArray(children) ? [].concat(...children) : [children]
+    children = Array.isArray(children) ? children : [children]
 
     // Process children
     for (let i=0, n=children.length; i<n; i++) {
@@ -40,13 +36,19 @@ export function normalize(children) {
 
         // Execute functions
         if (typeof child === 'function') {
-            result.push(...normalize(child()))
+            normalize(child(), result, keys)
             continue
         }
 
         // Text Element
         if (typeof child !== 'object') {
             result.push(new Element(Text, {value: child}))
+            continue
+        }
+
+        // Flatten array
+        if (Array.isArray(child)) {
+            normalize(child, result, keys)
             continue
         }
 
@@ -65,12 +67,12 @@ export function normalize(children) {
 
         // Filter Elements that have duplicate keys
         if (child.key != null) {
-            if (~keys.indexOf(child.key)) continue
-            keys.push(child.key)
+            if (child.key in keys) continue
+            keys[child.key] = null
         }
 
         result.push(child)
     }
-
+ 
     return result
 }

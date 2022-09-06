@@ -77,13 +77,53 @@ Plain text
 
 ## Hooks
 - [useState](#usestate)
+- [useReducer](#usereducer)
 - [useEffect, useLayoutEffect](#useEffect)
 - [useRef](#useref)
+- [useMemo](#usememo)
+- [useCallback](#usecallback)
 - [useStore](#usestore)
 
 ### useState
 ```javascript
-const [state, setState] = useState(initialValue)
+const [state, setState] = useState(initialState)
+```
+```javascript
+function Component() {
+    const [count, setCount] = useState(0)
+    const inc = () => setCount(count + 1);
+    const dec = () => setCount(state => state - 1);
+    return <>
+        <p>Count: {count}</p>
+        <button onClick={inc}> + </button>
+        <button onClick={dec}> - </button>
+    </>
+}
+```
+
+### useReducer
+```javascript
+const [state, dispatch] = useReducer(reducer, initialState)
+```
+```javascript
+const reducer = (state, action) => {
+    switch (action) {
+        case 'inc': return state + 1
+        case 'dec': return state - 1
+        case 'res': return 0
+        default: throw new Error('Unexpected action')
+    }
+}
+
+function Component() {
+    const [count, dispatch] = useReducer(reducer, 0)
+    return <>
+        <p>Count: {count}</p>
+        <button onClick={() => dispatch('inc')}> + </button>
+        <button onClick={() => dispatch('dec')}> - </button>
+        <button onClick={() => dispatch('res')}> Reset </button>
+    </>
+}
 ```
 
 ### <a id='useEffect'></a> useEffect  `(async)`, useLayoutEffect `(sync)`
@@ -100,17 +140,40 @@ useEffect(func, [a, b])
 
 ### useRef
 ```javascript
-const ref = useRef(initialValue)
+const ref = useRef(initialValue = null)
 ```
+The `ref` value can be accesed by `ref.current` or just received by calling `ref()`:
 ```javascript
 function Component() {
-    const inputElement = useRef()
-    const onButtonClick = () => inputElement.current.focus()
+    const input = useRef()
+    const onButtonClick = () => input.current && input.current.focus()
+    // const onButtonClick = () => input() && input().focus()
     return <>
-        <input ref={inputElement} type="text" />
+        <input ref={input} type="text" />
         <button onClick={onButtonClick}>Focus the input</button>
     </>
 }
+```
+#### Callback Refs
+```javascript
+function Component() {
+    let input = null
+    const onButtonClick = () => input && input.focus()
+    return <>
+        <input ref={(el) => input = el} type="text" />
+        <button onClick={onButtonClick}>Focus the input</button>
+    </>
+}
+```
+
+### useMemo
+```javascript
+const memoizedResult = useMemo(fn, deps)
+```
+
+### useCallback
+```javascript
+const memoizedCallback = useCallback(fn, deps)
 ```
 
 ### useStore
@@ -132,23 +195,21 @@ A ___store___ is an object that contains a ___global state___ (properties) and _
 
 ### createStore
 ```javascript
-const store = createStore(Class)
+const store = createStore(ClassName)
 ```
 ```javascript
 import ley, { createStore, useStore } from 'ley'
 import api from 'ley/api'
 
-class Theme
-{
+class Theme {
+
     static styles = ['light', 'dark']
 
-    constructor()
-    {
+    constructor() {
         this.style = 'dark'
     }
 
-    toggleStyle()
-    {
+    toggleStyle() {
         // 1) Inner calls to other actions do not cause additional rendering.
         // 2) Returning "null" from the most outer action prevents rendering.
         return this.style === 'light'
@@ -156,8 +217,7 @@ class Theme
             : this.setStyle('light')
     }
 
-    setStyle(style)
-    {
+    setStyle(style) {
         if (!Theme.styles.includes(style)) {
             return null
         }
@@ -181,10 +241,9 @@ ley(<App/>)
 ### Asynchronous actions
 The reserved method `this.action([callback])` performs manual dispatch.
 ```javascript
-class Users
-{
-    constructor()
-    {
+class Users {
+
+    constructor() {
         this.users = []
     }
     
@@ -192,12 +251,12 @@ class Users
         api.get('/users').success((res) => {
             this.users = res.list
             this.action()
-            // Or use a callback:
+            // Or wrap changes in a callback:
             // this.action(() => {
             //    this.users = res.list
             // })
         })
-        return null // prevent rendering right now
+        return null // prevent rendering at the moment
     }
 }
 ```

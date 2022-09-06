@@ -1,4 +1,4 @@
-import { createStore } from './ui/hooks'
+import { createStore } from './ui/Hooks'
 
 class Router {
 

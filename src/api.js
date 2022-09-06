@@ -45,7 +45,6 @@ export class Api {
 }
 
 function XHRHandler(xhr) {
-    
     const error = e => this.error && this.error(xhr.response, xhr.status, e)
     xhr.onerror = xhr.ontimeout = error
     xhr.onprogress = e => this.progress && this.progress(e)

@@ -1,7 +1,7 @@
 import { Text } from './Element'
 
 /**
- * TODO: SVG elements
+ * [TODO] SVG elements
  * 
  * Creates a DOM node.
  */
@@ -34,10 +34,13 @@ export function updateNode(fiber) {
     // Obsolete props
     for (const prop in prevProps) {
         if (isReserved(prop)) continue
+        const value = prevProps[prop]
 
         // Unset Ref
         if (prop === 'ref') {
-            prevProps[prop].current = null
+            value.hasOwnProperty('current')
+                ? value.current = null
+                : value(null)
             continue
         }
 
@@ -57,35 +60,37 @@ export function updateNode(fiber) {
     // Updated props
     for (const prop in nextProps) {
         if (isReserved(prop)) continue
+        const value = nextProps[prop]
 
         // Ref
         if (prop === 'ref') {
-            nextProps[prop].current = node
+            value.hasOwnProperty('current')
+                ? value.current = node
+                : value(node)
             continue
         }
 
         // Event listener
         if (/^on.+/i.test(prop)) {
-            node[prop.toLowerCase()] = nextProps[prop]
+            node[prop.toLowerCase()] = value
             continue
         }
 
         // Skip same values
-        if (prevProps.hasOwnProperty(prop) && prevProps[prop] === nextProps[prop]) {
+        if (prevProps.hasOwnProperty(prop) && prevProps[prop] === value) {
             continue
         }
 
         // Attribute
         if (prop === 'value') {
-            node.value = nextProps[prop]
-        } else if (typeof nextProps[prop] === 'boolean' && nextProps[prop]) {
+            node.value = value
+        } else if (typeof value === 'boolean' && value) {
             node.setAttribute(prop, '')
-        } else if (nextProps[prop] != null) {
-            node.setAttribute(prop, nextProps[prop])
+        } else if (value != null) {
+            node.setAttribute(prop, value)
         } else {
             node.removeAttribute(prop)
         }
-
     }
 
     return node

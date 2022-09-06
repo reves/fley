@@ -11,12 +11,16 @@ export function is(x, y) {
     )
 }
 
-export function getMethodsNames(Class) {
-    const names = []
-    let prototype = Class.prototype
+export function same(prev, next) {
+    return prev && prev.length === next.length && prev.every((p, i) => is(p, next[i]))
+}
+
+export function getMethods(ClassName) {
+    const methods = []
+    let prototype = ClassName.prototype
     while (prototype.constructor !== Object) {
-        names.push(...Object.getOwnPropertyNames(prototype))
+        methods.push(...Object.getOwnPropertyNames(prototype))
         prototype = Object.getPrototypeOf(prototype)
     }
-    return names.filter(n => n !== 'constructor')
+    return methods.filter(m => m !== 'constructor')
 }

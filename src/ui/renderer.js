@@ -1,14 +1,8 @@
 import * as dom from './dom'
 import Fiber, { tag, clone, clean } from './Fiber'
 import Element, { Text, Inline, normalize } from './Element'
-import { is } from '../utils'
-import { loseStore } from './hooks'
-import { resetCursor, effectType, storesWatchers } from './hooks'
-
-/**
- * TODO:
- * - Consider [maximum call stack], when a fiber has many children.
- */
+import { same } from '../utils'
+import { resetCursor, effectType, storesWatchers, loseStore } from './Hooks'
 
 export let current = null
 let root = null
@@ -22,7 +16,7 @@ const queue = {
 }
 
 /**
- * Initiates the rendering process of the fiber tree.
+ * Initiates the rendering process of the fiber subtree.
  */
 export function update(fiber) {
 
@@ -90,7 +84,6 @@ function render(deadline) {
  * Returns the next fiber to render.
  */
 function reconcile(fiber) {
-
     switch (true) {
         case fiber.isComponent:
             resetCursor()
@@ -116,7 +109,8 @@ function reconcile(fiber) {
 }
 
 /**
- * Compares the child fibers to the elements and decides which changes to apply.
+ * Compares the existing child fibers to the new JSX elements and decides which 
+ * changes to apply.
  */
 function reconcileChildren(parent, elements = []) {
 
@@ -309,14 +303,14 @@ function getElementByKey(elements, startIndex, key) {
  */
 function commit() {
 
-    // Force sync execution of remaining effects
+    // Force sync execution of remaining scheduled effects from previous commit
     if (queue.effects.length) {
         clearTimeout(queue.effectTimeoutId)
         queue.effects.forEach(e => e())
         queue.effects.length = 0
     }
 
-    // Relace the alternate with the updated fiber in the tree
+    // Relace the alternate from the main tree with the updated fiber
     if (root.parent) {
         root.sibling = root.alt.sibling
         if (root.alt.parent.child === root.alt) {
@@ -328,13 +322,34 @@ function commit() {
         }
     }
 
-    deletions.forEach(fiber => unmount(fiber))
-    mutate(root)
-    deletions.forEach(remove)
+    // Unmount obsolete components
+    for (let i=0, n=deletions.length; i<n; i++) {
+        const mainFiber = deletions[i]
+        if (!mainFiber.isComponent) continue
+        walkDepth(mainFiber, unmoutComponent)
+    }
+
+    // Mutate DOM
+    walkDepth(root, mutate)
+
+    // Remove obsolete nodes from the DOM
+    for (let i=0, n=deletions.length; i<n; i++) {
+        const fiber = deletions[i]
+        if (!fiber.isComponent) {
+            fiber.node.parentNode.removeChild(fiber.node)
+            continue
+        }
+        const nodes = getChildNodes(fiber)
+        for (let j=0, m=nodes.length; j<m; j++) {
+            const node = nodes[j]
+            node.parentNode.removeChild(node)
+        }
+    }
+
     reset()
 
     // Produce layout effects
-    queue.layoutEffects.forEach(e => e.cleanup = e.cb())
+    queue.layoutEffects.forEach(e => e.cleanup = e.fn())
     queue.layoutEffects.length = 0
 
     // Schedule effects
@@ -349,81 +364,36 @@ function scheduleNextEffect() {
     })
 }
 
-/**
- * Unmounts components.
- */
-function unmount(fiber, depth = false) {
-    if (!fiber) return
-    unmount(fiber.child, true)
-    if (fiber.isComponent) {
-        fiber.hooks.fiber = null
-        fiber.hooks.effects.forEach(e => e.cleanup && e.cleanup())
-        fiber.hooks.stores.forEach(store => loseStore(store, fiber))
-    }
-    if (depth) unmount(fiber.sibling, true)
+function unmoutComponent(fiber) {
+    fiber.hooks.fiber = null
+    fiber.hooks.effects.forEach(e => e.cleanup && e.cleanup())
+    fiber.hooks.stores.forEach(store => loseStore(store, fiber))
 }
 
-/**
- * Removes nodes from the DOM.
- */
-function remove(fiber) {
-    if (!fiber.isComponent) fiber.node.parentNode.removeChild(fiber.node)
-    else getNodes(fiber.child).forEach(n => n.parentNode.removeChild(n))
-}
-
-/**
- * Performs DOM mutations and components side effects.
- */
 function mutate(fiber) {
-    if (!fiber) return
-    mutate(fiber.child)
-    side(fiber)
-
+    const isComponent = fiber.isComponent
+    if (isComponent) side(fiber)
     switch (fiber.tag) {
         case tag.INSERT:
-            const node = fiber.isComponent ? document.createDocumentFragment() : fiber.node
-            if (fiber.isComponent) getNodes(fiber.child).forEach(n => node.appendChild(n))
+            const node = isComponent ? document.createDocumentFragment() : fiber.node
+            if (isComponent) getChildNodes(fiber).forEach(n => node.appendChild(n))
             getParentNode(fiber).insertBefore(node, fiber.relation
                 ? fiber.relation.isComponent
-                    ? getNodes(fiber.relation.child).pop().nextSibling
+                    ? getChildNodes(fiber.relation).pop().nextSibling
                     : fiber.relation.node.nextSibling
                 : null)
             break
         case tag.UPDATE:
-            if (!fiber.isComponent) dom.updateNode(fiber)
+            if (!isComponent) dom.updateNode(fiber)
             break
     }
-
-    if (fiber !== root) mutate(fiber.sibling)
     clean(fiber)
-}
-
-/**
- * Returns the closest parent node.
- */
-function getParentNode(fiber) {
-    while (!fiber.parent.node) fiber = fiber.parent
-    return fiber.parent.node
-}
-
-/**
- * Returns an Array of child and sibling nodes.
- */
-function getNodes(fiber) {
-    if (!fiber) return []
-    const nodes = []
-    if (fiber.isComponent) nodes.push(...getNodes(fiber.child))
-    else nodes.push(fiber.node)
-    nodes.push(...getNodes(fiber.sibling))
-    return nodes
 }
 
 /**
  * Handles component side effects.
  */
 function side(fiber) {
-
-    if (!fiber.isComponent) return
 
     // Update Hooks to Fiber reference
     fiber.hooks.fiber = fiber
@@ -438,21 +408,18 @@ function side(fiber) {
 
     // Handle effects
     fiber.hooks.effects.forEach((effect) => {
-        
         const prev = effect.deps.prev
         const next = effect.deps.next
 
         // Dependencies unchanged
-        if (prev && prev.length === next.length && prev.every((p, i) => is(p, next[i]))) {
-            return
-        }
+        if (same(prev, next)) return
 
         // Depencencies changed
         const cleanup = effect.cleanup
         switch (effect.type) {
             case effectType.EFFECT:
                 if (cleanup) queue.effects.push(() => cleanup())
-                queue.effects.push(() => effect.cleanup = effect.cb())
+                queue.effects.push(() => effect.cleanup = effect.fn())
                 break
 
             case effectType.LAYOUT:
@@ -462,4 +429,66 @@ function side(fiber) {
         }
         effect.deps.prev = next
     })
+}
+
+/**
+ * Returns the closest parent node.
+ */
+function getParentNode(fiber) {
+    while (!fiber.parent.node) fiber = fiber.parent
+    return fiber.parent.node
+}
+
+/**
+ * Returns the closest child nodes.
+ */
+function getChildNodes(mainFiber) {
+    const nodes = []
+    let fiber = mainFiber.child
+    while (true) {
+        if (!fiber.isComponent) {
+            nodes.push(fiber.node)
+        } else if (fiber.child) {
+            fiber = fiber.child
+            continue
+        }
+        if (fiber.sibling) {
+            fiber = fiber.sibling
+            continue
+        }
+        while (true) {
+            fiber = fiber.parent
+            if (fiber === mainFiber) return nodes
+            if (fiber.sibling) {
+                fiber = fiber.sibling
+                break
+            }
+        }
+    }
+}
+
+/**
+ * Walks the tree (depth first) and applies the callback to each fiber.
+ */
+function walkDepth(mainFiber, callback) {
+    let fiber = mainFiber
+    let goDeep = true
+    while (true) {
+        if (goDeep && fiber.child) {
+            fiber = fiber.child
+            continue
+        }
+        callback(fiber)
+        while (true) {
+            if (fiber === mainFiber) return
+            if (fiber.sibling) {
+                fiber = fiber.sibling
+                goDeep = true
+                break
+            }
+            fiber = fiber.parent
+            goDeep = false
+            break
+        }
+    }
 }
