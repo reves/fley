@@ -324,9 +324,7 @@ function commit() {
 
     // Unmount obsolete components
     for (let i=0, n=deletions.length; i<n; i++) {
-        const mainFiber = deletions[i]
-        if (!mainFiber.isComponent) continue
-        walkDepth(mainFiber, unmoutComponent)
+        walkDepth(deletions[i], unmoutComponent)
     }
 
     // Mutate DOM
@@ -365,6 +363,7 @@ function scheduleNextEffect() {
 }
 
 function unmoutComponent(fiber) {
+    if (!fiber.isComponent) return
     fiber.hooks.fiber = null
     fiber.hooks.effects.forEach(e => e.cleanup && e.cleanup())
     fiber.hooks.stores.forEach(store => loseStore(store, fiber))
