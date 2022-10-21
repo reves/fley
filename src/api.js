@@ -1,4 +1,4 @@
-import { getCookie } from './utils'
+import { getCookie } from '../utils'
 
 export class Api {
 

@@ -5,34 +5,38 @@ Frontend JavaScript web framework based on [JSX syntax](https://github.com/faceb
 - [Installation](#installation)
 - [Usage](#usage)
 - [Hooks](#hooks)
-- [Store (global states)](#store)
+- [Store (global state)](#store)
 - [Router](#router)
 - [I18n](#i18n)
 - [API Client](#api-client)
+- [Pre-rendering (SSR)](#pre-rendering-ssr)
 
 ## Installation
 ```console
 npm i ley@npm:@reves/ley
 ```
-
-#### Required development packages
 ```console
 npm i -D @babel/core @babel/plugin-transform-react-jsx
 ```
 #### Set up the [Babel JSX transform plugin](https://babeljs.io/docs/en/babel-plugin-transform-react-jsx#usage)
 ```javascript
-plugins: [
-    [
-        '@babel/plugin-transform-react-jsx',
-        {
-            runtime: 'automatic',
-            importSource: 'ley'
+// e.g. in webpack.config.js
+{
+    test: /\.jsx?$/,
+    exclude: /node_modules/,
+    use: {
+        loader: 'babel-loader',
+        options: {
+            plugins: [[
+                '@babel/plugin-transform-react-jsx',
+                { runtime: 'automatic', importSource: 'ley' }
+            ]]
         }
-    ],
-]
+    }
+},
 ```
 ## Usage
-- [Inline HTML](#inline-html)
+
 ```javascript
 ley('Hello, World!') // By default, uses document.body as the root element.
 ley('Hello, World!', document.getElementById('app'))
@@ -50,19 +54,24 @@ function App() {
 
 ley(<App/>)
 ```
-#### Inline HTML
+#### Inline HTML, SVGs
 
 ```javascript
 import ley, { Inline } from 'ley'
-import icon from './icon.svg' // e.g. import with Webpack asset/source
+import iconUser from './icon-user.svg' // e.g. import with Webpack as an asset/source
+
+// (!) SVG elements can only be used as Inline elements.
+// The created DOM node will be reused if the 'html' string
+// remains the same, or a unique 'key' is set.
 
 ley(<>
-    <Inline html={icon} width="16px" key="[unique-key-to-reuse-node]" />
-    <Inline html="<ul> <li>One</li> <li>Two</li> </ul>" style="color: green;" />
-    <Inline html="<p>The first outer element is rendered</p> <p>This is omitted</p>" />
+    <Inline html={iconUser} width="16px" key="icon-user"/>
+    <Inline html="<ul> <li>One</li> <li>Two</li> </ul>" style="color: green;"/>
+    <Inline html="Must start with an outer element. <p>This is omitted</p>"/>
     <Inline html="Plain text" />
 </>)
 ```
+Result
 ```html
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="16px">
     <circle cx="50" cy="50" r="50"></circle>
@@ -71,7 +80,7 @@ ley(<>
     <li>One</li>
     <li>Two</li>
 </ul>
-<p>The first outer element is rendered</p>
+Must start with an outer element.
 Plain text
 ```
 
@@ -83,6 +92,10 @@ Plain text
 - [useMemo](#usememo)
 - [useCallback](#usecallback)
 - [useStore](#usestore)
+- [Metadata](#metadata)
+    - [useTitle](#usetitle)
+    - [useMeta](#usemeta)
+    - [useSchema](#useschema)
 
 ### useState
 ```javascript
@@ -128,26 +141,27 @@ function Component() {
 
 ### <a id='useEffect'></a> useEffect  `(async)`, useLayoutEffect `(sync)`
 ```javascript
+useEffect(fn, [deps])
+```
+```javascript
 useEffect(() => {
     // side effect
     return () => {
         // cleanup
     }
 })
-useEffect(func, [])
-useEffect(func, [a, b])
 ```
 
 ### useRef
 ```javascript
 const ref = useRef(initialValue = null)
 ```
-The `ref` value can be accesed by `ref.current` or just received by calling `ref()`:
+The current value can be received by `ref()` and set by `ref(newValue)`, or accesed directly via `ref.current`.
 ```javascript
 function Component() {
     const input = useRef()
-    const onButtonClick = () => input.current && input.current.focus()
-    // const onButtonClick = () => input() && input().focus()
+    const onButtonClick = () => input()?.focus()
+    // const onButtonClick = () => input.current?.focus()
     return <>
         <input ref={input} type="text" />
         <button onClick={onButtonClick}>Focus the input</button>
@@ -158,7 +172,7 @@ function Component() {
 ```javascript
 function Component() {
     let input = null
-    const onButtonClick = () => input && input.focus()
+    const onButtonClick = () => input?.focus()
     return <>
         <input ref={(el) => input = el} type="text" />
         <button onClick={onButtonClick}>Focus the input</button>
@@ -168,12 +182,12 @@ function Component() {
 
 ### useMemo
 ```javascript
-const memoizedResult = useMemo(fn, deps)
+const memoizedResult = useMemo(fn, [deps])
 ```
 
 ### useCallback
 ```javascript
-const memoizedCallback = useCallback(fn, deps)
+const memoizedCallback = useCallback(fn, [deps])
 ```
 
 ### useStore
@@ -187,8 +201,59 @@ function Component() {
 }
 ```
 
+### Metadata
+Managing the metadata in the `<head>` section.
+```javascript
+import { useTitle, useMeta, useSchema } from 'ley/head'
+
+// Hooks used in a deeper and farther component overwrite the value.
+```
+
+#### useTitle
+Sets the document title.
+```javascript
+useTitle("Home page")
+```
+```html
+<title>Home page</title>
+```
+
+#### useMeta
+Adds meta tags (removes all previously added tags before adding new ones).
+```javascript
+useMeta([
+    { name: "description", content: "Book description." },
+    { property: "og:title", content: "Book Title" },
+])
+```
+```html
+<meta name="description" content="Book description.">
+<meta property="og:title" content="Book Title">
+```
+
+#### useSchema
+Updates the structured data.
+```javascript
+useSchema({
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "name": "Book Title",
+    "description": "Book description.",
+})
+```
+```html
+<script type="application/ld+json">
+    {
+        "@context": "https://schema.org/",
+        "@type": "Book",
+        "name": "Book Title",
+        "description": "Book description."
+    }
+</script>
+```
+
 ## Store
-A ___store___ is an object that contains a ___global state___ (properties) and ___actions___ (non-static methods).
+A ___store___ is an object that contains a ___state___ (properties) and its ___actions___ (non-static methods).
 
 - [createStore](#createstore)
 - [Asynchronous actions](#asynchronous-actions)
@@ -251,7 +316,7 @@ class Users {
         api.get('/users').success((res) => {
             this.users = res.list
             this.action()
-            // Or wrap changes in a callback:
+            // Or just wrap the changes in a callback:
             // this.action(() => {
             //    this.users = res.list
             // })
@@ -264,21 +329,20 @@ class Users {
 ## Router
 - router.name - The name of the route that matches the current path.
 - router.path - The current path.
-- router.params - Dynamic params (regExp named capturing groups).
-- router.query - Query parameters from the current URL.
+- router.params - Dynamic params (regex named capturing groups).
+- router.query - Query parameters from the current URL (after `?`).
 - router.hash - The fragment from the current URL (including `#`).
 - router.from - The name of the previous route.
 - [router.define()](#routerdefine)
 - [router.go()](#routergo)
-- [Metadata](#metadata)
 
 ```javascript
 import ley, { useStore } from 'ley'
 import router from 'ley/router'
 
 router.define({
-	home: /\/$/i,
-	about: /\/about/i,
+	home: /^\/$/i,
+	about: /^\/about$/i,
 })
 
 function App() {
@@ -302,8 +366,8 @@ ley(<App/>)
 Defines named routes using regular expressions, especially [named groups](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Groups_and_Ranges#using_named_groups) for dynamic params.
 ```javascript
 router.define({
-	home: /\/$/i,
-	user: /\/user\/(?<username>.*)$/i, // router.params.username
+	home: /^\/$/i,
+	user: /^\/user\/(?<username>.*)$/i, // router.params.username
 })
 ```
 #### router.go()
@@ -311,67 +375,6 @@ Navigates programmatically.
 ```javascript
 router.go('/about')
 router.go('/about', () => window.scrollTo(0, 0))
-```
-
-### Metadata
-Managing metadata in the `<head>` section.
-```javascript
-import { setTitle, setMeta, setSchema } from 'ley/router'
-
-// These functions run as side effects and therefore do not change the state of 
-// the router (no re-rendering).
-```
-
-#### Title
-Updates the document title.
-```javascript
-setTitle("Home Page")
-```
-```html
-<head>
-    <!-- ... -->
-    <title>Home Page</title>
-</head>
-```
-
-#### Meta tags
-Adds meta tags. On subsequent calls, removes all previously added tags before adding new ones.
-```javascript
-setMeta([
-    { name: "description", content: "Book description." },
-    { property: "og:title", content: "Book Title" },
-])
-```
-```html
-<head>
-    <!-- ... -->
-    <meta name="description" content="Book description.">
-    <meta property="og:title" content="Book Title">
-</head>
-```
-
-#### Schema
-Updates the structured data.
-```javascript
-setSchema({
-    "@context": "https://schema.org/",
-    "@type": "Book",
-    "name": "Book Title",
-    "description": "Book description.",
-})
-```
-```html
-<head>
-    <!-- ... -->
-    <script type="application/ld+json">
-        {
-            "@context": "https://schema.org/",
-            "@type": "Book",
-            "name": "Book Title",
-            "description": "Book description."
-        }
-    </script>
-</head>
 ```
 
 ## I18n
@@ -723,3 +726,165 @@ const handler = api.get('/books?id=1')
 // Something happened ...
 handler.abort()
 ```
+
+## Pre-rendering (SSR)
+1. Compile at build time a static HTML page for each defined route
+2. Match the route and serve the corresponding HTML from the server
+4. Hydrate on the client side
+
+A template engine can be used on the server side to include data. This can be achieved by first setting the initial state values to template variables in the application:
+```javascript
+const [title, setTitle] = useState('{{article.title}}')
+```
+
+#### 1. Replace `ley()` with `hydrate()` in `index.jsx`
+```javascript
+import hydrate, { isBrowser } from 'ley/hydrate'
+import router from 'ley/router'
+import App from './App/App'
+
+router.define({
+	home: /^\/$/i,
+	about: /^\/about$/i,
+	product: /^\/(?<product>[\w\d]+)$/i,
+})
+
+hydrate(<App/>, isBrowser && document.getElementById("app"))
+```
+
+####  2. Build the script
+```
+npm run build
+```
+####  3. Run the script to get the `routes` object
+Example of running the script with node.js:
+```javascript
+const path = require('path')
+const { execSync } = require('child_process')
+
+const distPath = path.resolve(__dirname, './dist')
+const result = execSync(`node ${distPath}/main.js`).toString()
+const routes = JSON.parse(result)
+```
+Example of the resulting `routes` object:
+```javascript
+{   
+    // Defined routes
+    home: {
+        regex: { source: '^\/$', flags: 'i' },
+        dom: {
+            title: 'Home page',
+            meta: '<meta name="description" content="App home page.">',
+            schema: '<script type="application/ld+json">{"@context":"https://schema.org/"}</script>',
+            content: '<h1>Welcome to the Home page.</h1>'
+        }
+    },
+    about: {
+        regex: { source: '^\/about$', flags: 'i' },
+        dom: { /* ... */ }
+    },
+    product: {
+        regex: { source: '^\/(?<product>[\w\d]+)$', flags: 'i' },
+        dom: { /* ... */ }
+    },
+
+    // Additional empty key for mismatch case (when route.name === '')
+    "": { 
+        regex: { source: '(?:)', flags: '' },
+        dom: {
+            title: 'Not found',
+            meta: '',
+            schema: '',
+            content: '<b>Error 404<b/> Page not found.'
+        }
+    }
+}
+```
+####  4. Save the content of the `routes` object on the server
+```javascript
+const fs = require('fs')
+
+fs.writeFileSync(`${serverPath}/routes.json`, JSON.stringify(routes))
+```
+
+####  5. Set up the server to serve the HTML of the corresponding route
+
+### Example using Webpack
+`index.html` – The main HTML template.
+```html
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <base href="/">
+    {{title}}
+    {{meta}}
+    {{schema}}
+    <script defer src="/{{bundle}}"></script>
+</head>
+<body>
+    <div id="app">{{content}}</div>
+</body>
+</html>
+```
+`webpack.config.js` – Webpack config with a custom plugin, that automatically runs the script after emit, compiles static HTML page for each route using the same template and saves the result on the server in a single `routes.json` file.
+```javascript
+const { execSync } = require('child_process')
+const path = require('path')
+const fs = require('fs')
+const minify = require('html-minifier').minify
+const minifyConfig = {
+    collapseWhitespace: true,
+    ignoreCustomFragments: [/{{[\s\S]*?}}/],
+    trimCustomFragments: true
+}
+const templateFile = path.resolve(__dirname, './index.html')
+const templateString = fs.readFileSync(templateFile).toString()
+const template = minify(templateString, minifyConfig)
+const render = require("handlebars").compile(template, { noEscape: true })
+
+const outputPath = path.resolve(__dirname, './dist')
+const outputFile = 'js/main.js'
+const serverPath = path.resolve(__dirname, '../server')
+
+const compilePlugin = {
+    apply: compiler => compiler.hooks.afterEmit.tap('MyCompilePlugin', (compilation) => {
+        const result = execSync(`node ${outputPath}/${outputFile}`).toString()
+        const routes = JSON.parse(result)
+        const bundle = compilation.getAsset(outputFile).name
+
+        // Render a static HTML page for each route using "Handlebars"
+        // package and the minified template "index.html"
+        for (const name in routes) {
+            // For convenience, assign the compiled static HTML
+            // to the "dom" property of the `routes` object
+            routes[name].dom = render({ bundle, ...routes[name].dom })
+        }
+
+        // Store the `routes` object on the server
+        fs.writeFileSync(`${serverPath}/routes.json`, JSON.stringify(routes))
+    })
+}
+
+module.exports = {
+    /* ... */,
+    plugins: [ compilePlugin, ]
+}
+```
+`index.php` – The server matches the current request URL path against the regex of each route until finds and returns the corresponding static HTML page.
+```php
+<?php
+$routes = json_decode(file_get_contents("./routes.json"), true);
+$path = strtok($_SERVER["REQUEST_URI"], '?');
+
+foreach ($routes as $name => $route) {
+    $regex = $route['regex'];
+    $pattern = "/{$regex['source']}/{$regex['flags']}";
+    if (preg_match($pattern, $path)) {
+        echo $route['dom'];
+        break;
+    }
+}
+```
+Finally, the hydration is performed on the client side.

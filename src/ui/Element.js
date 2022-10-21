@@ -1,12 +1,12 @@
 /**
- * JSX element types
+ * JSX Element types
  */
-export const Fragment = 'FRAGMENT'
-export const Inline = 'INLINE'
-export const Text = 'TEXT'
+export const Fragment = 0
+export const Inline = 1
+export const Text = 2
 
 /**
- * JSX element
+ * JSX Element
  */
 export default function Element(type, props, key) {
     if (props.hasOwnProperty('children')) {
@@ -28,9 +28,9 @@ export function normalize(children = [], result = [], keys = {}) {
     for (let i=0, n=children.length; i<n; i++) {
 
         const child = children[i]
-
-        // Remove unnecessary data types
-        if (child == null || child === false || child === true) {
+        
+        // Remove empty strings and unnecessary data types
+        if (child === '' || child == null || child === false || child === true) {
             continue
         }
 
@@ -42,7 +42,12 @@ export function normalize(children = [], result = [], keys = {}) {
 
         // Text Element
         if (typeof child !== 'object') {
-            result.push(new Element(Text, {value: child}))
+            const prev = result[result.length-1]
+            if (prev && prev.type === Text) {
+                prev.props.value += child
+                continue
+            }
+            result.push(new Element(Text, { value: '' + child }))
             continue
         }
 
@@ -54,15 +59,14 @@ export function normalize(children = [], result = [], keys = {}) {
 
         // Inline HTML
         if (child.type === Inline) {
-            let node = document.createElement('div')
-            node.innerHTML = child.props.html ?? ''
-            node = node.childNodes[0] ?? document.createTextNode('')
-            if (node.nodeName === '#text') {
-                result.push(new Element(Text, {value: node.nodeValue}))
+            const html = child.props.html.trim()
+            if (!html) continue
+            if (html[0] !== '<') {
+                result.push(new Element(Text, { value: html.split('<', 1)[0] }))
                 continue
             }
-            child.type = Symbol(Inline)
-            child.props.html = node
+            child.type = html
+            child.props.html = null
         }
 
         // Filter Elements that have duplicate keys

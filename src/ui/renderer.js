@@ -1,82 +1,78 @@
-import * as dom from './dom'
-import Fiber, { tag, clone, clean } from './Fiber'
-import Element, { Text, Inline, normalize } from './Element'
-import { same } from '../utils'
-import { resetCursor, effectType, storesWatchers, loseStore } from './Hooks'
+import Fiber, { TAG_SKIP, TAG_INSERT } from './Fiber'
+import { Text, Inline, normalize } from './Element'
+import { resetCursor } from './Hooks'
+import { isBrowser } from '../utils'
 
-export let current = null
+let concurrent = false
 let root = null
 let next = null
 let idleCallbackId = null
 const deletions = []
-const queue = {
-    layoutEffects: [],
-    effects: [],
-    effectTimeoutId: null
+export let current = null
+export const queue = {
+    sync: [],
+    async: [],
+    timeoutId: null,
+    reset: []
 }
+export let hydration = false
+let prevNode = null
 
 /**
  * Initiates the rendering process of the fiber subtree.
  */
-export function update(fiber) {
+export function update(fiber, hydrate = false) {
+    hydration = hydrate
 
-    // Already rendering
+    // If already rendering, find and update the common ancestor
     if (root) {
-        const parents = []
-
+        const ancestors = []
         let parent = root.alt
         while (parent) {
-            if (parent.isComponent) parents.push(parent)
+            if (parent.isComponent) ancestors.push(parent)
             parent = parent.parent
         }
-
-        let superiorFiber = fiber
-        while (parents.indexOf(superiorFiber) === -1) {
-            superiorFiber = superiorFiber.parent
-        }
-
+        let common = fiber
+        while (ancestors.indexOf(common) === -1) common = common.parent
         reset()
-        update(superiorFiber)
+        update(common)
         return
     }
 
-    // Schedule rendering
-    root = clone(fiber)
+    // Init the rendering process
+    root = fiber.clone()
     next = root
+    if (!concurrent) return render()
     idleCallbackId = requestIdleCallback(render)
 }
 
 /**
- * Stops the rendering process and resets the data.
+ * Cancels the rendering process and resets the data.
  */
 function reset() {
-    cancelIdleCallback(idleCallbackId)
+    if (idleCallbackId != null) cancelIdleCallback(idleCallbackId)
     idleCallbackId = null
-    deletions.length = 0
     root = null
     next = null
     current = null
+    deletions.length = 0
+    queue.sync.length = 0
+    for (const res of queue.reset) res()
 }
 
 /**
- * Renders the fiber tree in concurrent mode.
+ * Renders the fiber tree.
  */
 function render(deadline) {
-
-    // Main loop
-    while (deadline.timeRemaining() > 0 && next) {
-        current = next
-        next = reconcile(next)
+    // Main loop (sync)
+    if (!concurrent) {
+        while (next) next = reconcile(current = next)
+        return commit()
     }
-
-    // Schedule next step
-    if (next) {
-        idleCallbackId = requestIdleCallback(render)
-        return
-    }
-
-    // Completed
-    commit()
+    // Timed loop (concurrent)
+    while (deadline.timeRemaining() > 0 && next) next = reconcile(current = next)
+    if (!next) return commit()
+    idleCallbackId = requestIdleCallback(render)
 }
 
 /**
@@ -92,11 +88,11 @@ function reconcile(fiber) {
 
         case fiber.type === Text:
         case fiber.type === Inline:
-            dom.createNode(fiber)
+            if (!fiber.node && isBrowser && !hydration) fiber.createNode()
             break
 
         default:
-            dom.createNode(fiber)
+            if (!fiber.node && isBrowser && !hydration) fiber.createNode()
             reconcileChildren(fiber, fiber.props.children)
     }
 
@@ -113,29 +109,27 @@ function reconcile(fiber) {
  * changes to apply.
  */
 function reconcileChildren(parent, elements = []) {
-
-    if (!elements.length) elements = [new Element(Text, {value: ''}) ]
-
     let i = 0
     let alt = parent.alt?.child
-    let prevSibling = null
+    let prev = null
     let fiber = null
 
-    function relate(lookaheadElement = false) {
-        if (i === 0) parent.child = fiber
-        else prevSibling.sibling = fiber
-        prevSibling = fiber
+    const relate = (lookaheadElement = false) => {
         if (!lookaheadElement && alt) alt = alt.sibling
+        if (i === 0) { parent.child = fiber } else { prev.sibling = fiber }
+        prev = fiber
         i++
     }
+    const scheduleDeletion = (obsolete = false) => 
+        (obsolete || alt.isComponent || fiber.isComponent) && deletions.push(alt)
 
     while (true) {
 
         const element = elements[i]
 
         // Looked-ahead element
-        if (element && element.relation) {
-            fiber = clone(element.relation, parent, element.props, tag.INSERT, prevSibling)
+        if (element?.relation) {
+            fiber = element.relation.clone(parent, element.props, TAG_INSERT)
             relate(true)
             continue
         }
@@ -143,7 +137,8 @@ function reconcileChildren(parent, elements = []) {
         if (alt) {
 
             // Looked-ahead alternate
-            if (alt.tag === tag.SKIP) {
+            if (alt.tag === TAG_SKIP) {
+                alt.tag = null
                 alt = alt.sibling
                 continue
             }
@@ -158,7 +153,7 @@ function reconcileChildren(parent, elements = []) {
 
                         // Equal keys
                         if (alt.key === element.key) {
-                            fiber = clone(alt, parent, element.props, tag.UPDATE)
+                            fiber = alt.clone(parent, element.props)
                             relate()
                             continue
                         }
@@ -171,27 +166,25 @@ function reconcileChildren(parent, elements = []) {
                         // Found an alternate with the same key as element
                         if (altWithSameKeyAsElement) {
 
-                            altWithSameKeyAsElement.tag = tag.SKIP
+                            altWithSameKeyAsElement.tag = TAG_SKIP
+                            fiber = altWithSameKeyAsElement.clone(parent, element.props, TAG_INSERT, alt)
 
                             // Found an element with the same key as alternate
                             if (elementWithSameKeyAsAlt) {
-                                const _tag = altWithSameKeyAsElement === alt.sibling ? tag.UPDATE : tag.INSERT
-                                fiber = clone(altWithSameKeyAsElement, parent, element.props, _tag, alt)
                                 elementWithSameKeyAsAlt.relation = alt
                                 relate()
                                 continue
                             }
 
                             // Not found element with the same key as alternate
-                            fiber = clone(altWithSameKeyAsElement, parent, element.props, tag.INSERT, alt)
-                            deletions.push(alt)
+                            scheduleDeletion()
                             relate()
                             continue
                         }
 
                         // Not found an alternate with the same key as element
 
-                        fiber = new Fiber(element, null, parent, tag.INSERT, alt)
+                        fiber = new Fiber(element, null, parent, TAG_INSERT, alt)
 
                         // Found an element with the same key as alternate
                         if (elementWithSameKeyAsAlt) {
@@ -201,7 +194,7 @@ function reconcileChildren(parent, elements = []) {
                         }
 
                         // Not found element with the same key as alternate
-                        deletions.push(alt)
+                        scheduleDeletion()
                         relate()
                         continue
                     }
@@ -209,17 +202,18 @@ function reconcileChildren(parent, elements = []) {
                     // Keyed alternate and non-keyed element
 
                     const elementWithSameKeyAsAlt = getElementByKey(elements, i+1, alt.key)
-                    fiber = new Fiber(element, null, parent, tag.INSERT, alt)
 
                     // Found an element with the same key as alternate
                     if (elementWithSameKeyAsAlt) {
+                        fiber = new Fiber(element, null, parent, TAG_INSERT)
                         elementWithSameKeyAsAlt.relation = alt
                         relate()
                         continue
                     }
 
                     // Not found an element with the same key as alternate
-                    deletions.push(alt)
+                    fiber = new Fiber(element, null, parent, TAG_INSERT, alt)
+                    scheduleDeletion()
                     relate()
                     continue
                 }
@@ -231,16 +225,16 @@ function reconcileChildren(parent, elements = []) {
 
                     // Found an alternate with the same key as element
                     if (altWithSameKeyAsElement) {
-                        fiber = clone(altWithSameKeyAsElement, parent, element.props, tag.INSERT, alt)
-                        altWithSameKeyAsElement.tag = tag.SKIP
-                        deletions.push(alt)
+                        altWithSameKeyAsElement.tag = TAG_SKIP
+                        fiber = altWithSameKeyAsElement.clone(parent, element.props, TAG_INSERT, alt)
+                        scheduleDeletion()
                         relate()
                         continue
                     }
 
                     // Not found an alternate with the same key as element
-                    fiber = new Fiber(element, null, parent, tag.INSERT, alt)
-                    deletions.push(alt)
+                    fiber = new Fiber(element, null, parent, TAG_INSERT, alt)
+                    scheduleDeletion()
                     relate()
                     continue
                 }
@@ -249,39 +243,32 @@ function reconcileChildren(parent, elements = []) {
 
                 // Same type
                 if (alt.type === element.type) {
-                    fiber = clone(alt, parent, element.props, tag.UPDATE)
+                    fiber = alt.clone(parent, element.props)
                     relate()
                     continue
                 }
 
                 // Different type
-                fiber = new Fiber(element, null, parent, tag.INSERT, alt)
-                deletions.push(alt)
+                fiber = new Fiber(element, null, parent, TAG_INSERT, alt)
+                scheduleDeletion()
                 relate()
                 continue
             }
 
             // Alternate exists but element does not
-            deletions.push(alt)
+            scheduleDeletion(true)
             alt = alt.sibling
             continue
         }
 
         // Element exists but alternate does not
         if (element) {
-            fiber = new Fiber(element, null, parent, tag.INSERT, prevSibling)
+            fiber = new Fiber(element, null, parent, TAG_INSERT)
             relate()
             continue
         }
 
         break
-    }
-
-    // Reset alternates tags
-    alt = parent.alt?.child
-    while (alt) {
-        alt.tag = null
-        alt = alt.sibling
     }
 }
 
@@ -299,15 +286,17 @@ function getElementByKey(elements, startIndex, key) {
 }
 
 /**
- * Applies changes to the DOM.
+ * Applies changes.
  */
 function commit() {
+    if (!isBrowser) return [root, reset]
 
-    // Force sync execution of remaining scheduled effects from previous commit
-    if (queue.effects.length) {
-        clearTimeout(queue.effectTimeoutId)
-        queue.effects.forEach(e => e())
-        queue.effects.length = 0
+    // Force sync execution of remaining async effects from previous commit
+    const async = queue.async
+    if (async.length) { 
+        clearTimeout(queue.timeoutId)
+        for (const effect of async) effect()
+        async.length = 0
     }
 
     // Relace the alternate from the main tree with the updated fiber
@@ -316,178 +305,44 @@ function commit() {
         if (root.alt.parent.child === root.alt) {
             root.alt.parent.child = root
         } else {
-            let prevSibling = root.alt.parent.child
-            while (prevSibling.sibling !== root.alt) prevSibling = prevSibling.sibling
-            prevSibling.sibling = root
+            let prev = root.alt.parent.child
+            while (prev.sibling !== root.alt) prev = prev.sibling
+            prev.sibling = root
         }
     }
 
-    // Unmount obsolete components
-    for (let i=0, n=deletions.length; i<n; i++) {
-        walkDepth(deletions[i], unmoutComponent)
-    }
+    // Call sync cleanups
+    const sync = queue.sync
+    for (let i=sync.length-1; i>=0; i--) sync[i]()
+    sync.length = 0
 
-    // Mutate DOM
-    walkDepth(root, mutate)
+    // Deletetions
+    for (const fiber of deletions) fiber.unmount()
 
-    // Remove obsolete nodes from the DOM
-    for (let i=0, n=deletions.length; i<n; i++) {
-        const fiber = deletions[i]
-        if (!fiber.isComponent) {
-            fiber.node.parentNode.removeChild(fiber.node)
-            continue
-        }
-        const nodes = getChildNodes(fiber)
-        for (let j=0, m=nodes.length; j<m; j++) {
-            const node = nodes[j]
-            node.parentNode.removeChild(node)
-        }
-    }
+    // Update DOM
+    root.walkDepth((fiber, nodeCursor) => {
+        fiber.update(nodeCursor)
+        fiber.reset()
+    })
 
-    reset()
+    // Produce sync effects queued in the "update" step
+    for (const effect of sync) effect()
+    sync.length = 0
 
-    // Produce layout effects
-    queue.layoutEffects.forEach(e => e.cleanup = e.fn())
-    queue.layoutEffects.length = 0
-
-    // Schedule effects
+    // Schedule async effects
     scheduleNextEffect()
+
+    // Done
+    reset()
+    concurrent = true
+    hydration = false
 }
 
 function scheduleNextEffect() {
-    if (!queue.effects.length) return
-    queue.effectTimeoutId = setTimeout(() => {
-        queue.effects.shift()()
+    const async = queue.async
+    if (!async.length) return
+    queue.timeoutId = setTimeout(() => {
+        async.shift()()
         scheduleNextEffect()
     })
-}
-
-function unmoutComponent(fiber) {
-    if (!fiber.isComponent) return
-    fiber.hooks.fiber = null
-    fiber.hooks.effects.forEach(e => e.cleanup && e.cleanup())
-    fiber.hooks.stores.forEach(store => loseStore(store, fiber))
-}
-
-function mutate(fiber) {
-    const isComponent = fiber.isComponent
-    if (isComponent) side(fiber)
-    switch (fiber.tag) {
-        case tag.INSERT:
-            const node = isComponent ? document.createDocumentFragment() : fiber.node
-            if (isComponent) getChildNodes(fiber).forEach(n => node.appendChild(n))
-            getParentNode(fiber).insertBefore(node, fiber.relation
-                ? fiber.relation.isComponent
-                    ? getChildNodes(fiber.relation).pop().nextSibling
-                    : fiber.relation.node.nextSibling
-                : null)
-            break
-        case tag.UPDATE:
-            if (!isComponent) dom.updateNode(fiber)
-            break
-    }
-    clean(fiber)
-}
-
-/**
- * Handles component side effects.
- */
-function side(fiber) {
-
-    // Update Hooks to Fiber reference
-    fiber.hooks.fiber = fiber
-
-    // Update stores watchers lists
-    fiber.alt?.hooks.stores.forEach((store) => {
-        const watchers = storesWatchers.get(store)
-        const index = watchers.indexOf(fiber.alt)
-        if (!~index) watchers.push(fiber)
-        else watchers[index] = fiber
-    })
-
-    // Handle effects
-    fiber.hooks.effects.forEach((effect) => {
-        const prev = effect.deps.prev
-        const next = effect.deps.next
-
-        // Dependencies unchanged
-        if (same(prev, next)) return
-
-        // Depencencies changed
-        const cleanup = effect.cleanup
-        switch (effect.type) {
-            case effectType.EFFECT:
-                if (cleanup) queue.effects.push(() => cleanup())
-                queue.effects.push(() => effect.cleanup = effect.fn())
-                break
-
-            case effectType.LAYOUT:
-                if (cleanup) cleanup()
-                queue.layoutEffects.push(effect)
-                break
-        }
-        effect.deps.prev = next
-    })
-}
-
-/**
- * Returns the closest parent node.
- */
-function getParentNode(fiber) {
-    while (!fiber.parent.node) fiber = fiber.parent
-    return fiber.parent.node
-}
-
-/**
- * Returns the closest child nodes.
- */
-function getChildNodes(mainFiber) {
-    const nodes = []
-    let fiber = mainFiber.child
-    while (true) {
-        if (!fiber.isComponent) {
-            nodes.push(fiber.node)
-        } else if (fiber.child) {
-            fiber = fiber.child
-            continue
-        }
-        if (fiber.sibling) {
-            fiber = fiber.sibling
-            continue
-        }
-        while (true) {
-            fiber = fiber.parent
-            if (fiber === mainFiber) return nodes
-            if (fiber.sibling) {
-                fiber = fiber.sibling
-                break
-            }
-        }
-    }
-}
-
-/**
- * Walks the tree (depth first) and applies the callback to each fiber.
- */
-function walkDepth(mainFiber, callback) {
-    let fiber = mainFiber
-    let goDeep = true
-    while (true) {
-        if (goDeep && fiber.child) {
-            fiber = fiber.child
-            continue
-        }
-        callback(fiber)
-        while (true) {
-            if (fiber === mainFiber) return
-            if (fiber.sibling) {
-                fiber = fiber.sibling
-                goDeep = true
-                break
-            }
-            fiber = fiber.parent
-            goDeep = false
-            break
-        }
-    }
 }

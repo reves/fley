@@ -1,18 +1,11 @@
+export const isBrowser = typeof window !== "undefined"
+    && typeof window.document !== "undefined"
+
 export function getCookie(name) {
     if (!name) return ''
     return document.cookie.replace(
         new RegExp('(?:(?:^|.*; *)' + name + '=([^;]*).*$)|^.*$'), '$1'
     )
-}
-
-export function is(x, y) {
-    return (
-        (x === y && (x !== 0 || 1 / x === 1 / y)) || (x !== x && y !== y)
-    )
-}
-
-export function same(prev, next) {
-    return prev && prev.length === next.length && prev.every((p, i) => is(p, next[i]))
 }
 
 export function getMethods(ClassName) {
