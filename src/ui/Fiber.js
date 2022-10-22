@@ -46,6 +46,7 @@ export default class Fiber {
         this.alt = null
         this.tag = null
         this.replace = null
+        this.props.children &&= null
     }
 
     /**
@@ -66,27 +67,24 @@ export default class Fiber {
                 if (len < this.node.nodeValue.length) this.node.splitText(len)
             }
             this.updateNode()
-            // console.log((this.type === Text ? `"${this.props.value}"` : `<${this.type}>`), nodeCursor)
             return
         }
 
-        if (!this.tag) {
-            this.updateNode()
+        this.updateNode()
+
+        if (!this.tag) return
+
+        // TAG_INSERT
+        const parentNode = this.getParentNode()
+        const replace = this.replace
+        if (replace && !replace.isComponent) {
+            parentNode.replaceChild(this.node, replace.node)
             return
         }
-
-        if (this.tag === TAG_INSERT) {
-            const parentNode = this.getParentNode()
-            const replace = this.replace
-            if (replace && !replace.isComponent) {
-                parentNode.replaceChild(this.node, replace.node)
-                return
-            }
-            const relNode = nodeCursor
-                ? nodeCursor.nextSibling
-                : parentNode.firstChild
-            parentNode.insertBefore(this.node, relNode)
-        }
+        const relNode = nodeCursor
+            ? nodeCursor.nextSibling
+            : parentNode.firstChild
+        parentNode.insertBefore(this.node, relNode)
     }
 
     /**
@@ -106,7 +104,6 @@ export default class Fiber {
             const node = elements[this.type] ??= document.createElement(this.type)
             this.node = node.cloneNode()
         }
-        this.updateNode()
     }
 
     /**

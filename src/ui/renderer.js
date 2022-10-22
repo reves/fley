@@ -3,6 +3,8 @@ import { Text, Inline, normalize } from './Element'
 import { resetCursor } from './Hooks'
 import { isBrowser } from '../utils'
 
+let syncOnly = false
+export const setSyncOnly = _ => syncOnly = true
 let concurrent = false
 let root = null
 let next = null
@@ -16,7 +18,6 @@ export const queue = {
     reset: []
 }
 export let hydration = false
-let prevNode = null
 
 /**
  * Initiates the rendering process of the fiber subtree.
@@ -83,7 +84,7 @@ function reconcile(fiber) {
     switch (true) {
         case fiber.isComponent:
             resetCursor()
-            reconcileChildren(fiber, normalize(fiber.type(fiber.props)))
+            reconcileChildren(fiber, normalize(fiber.type(fiber.props)), fiber.tag)
             break
 
         case fiber.type === Text:
@@ -108,7 +109,7 @@ function reconcile(fiber) {
  * Compares the existing child fibers to the new JSX elements and decides which 
  * changes to apply.
  */
-function reconcileChildren(parent, elements = []) {
+function reconcileChildren(parent, elements = [], parentTag) {
     let i = 0
     let alt = parent.alt?.child
     let prev = null
@@ -153,7 +154,7 @@ function reconcileChildren(parent, elements = []) {
 
                         // Equal keys
                         if (alt.key === element.key) {
-                            fiber = alt.clone(parent, element.props)
+                            fiber = alt.clone(parent, element.props, parentTag)
                             relate()
                             continue
                         }
@@ -243,7 +244,7 @@ function reconcileChildren(parent, elements = []) {
 
                 // Same type
                 if (alt.type === element.type) {
-                    fiber = alt.clone(parent, element.props)
+                    fiber = alt.clone(parent, element.props, parentTag)
                     relate()
                     continue
                 }
@@ -334,7 +335,7 @@ function commit() {
 
     // Done
     reset()
-    concurrent = true
+    if (!syncOnly) concurrent = true
     hydration = false
 }
 
