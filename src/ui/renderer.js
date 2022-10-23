@@ -12,6 +12,7 @@ let idleCallbackId = null
 const deletions = []
 export let current = null
 export const queue = {
+    update: [],
     sync: [],
     async: [],
     timeoutId: null,
@@ -25,18 +26,20 @@ export let hydration = false
 export function update(fiber, hydrate = false) {
     hydration = hydrate
 
-    // If already rendering, find and update the common ancestor
+    // Already rendering
     if (root) {
-        const ancestors = []
+        // Root itself or its ancestor
         let parent = root.alt
         while (parent) {
-            if (parent.isComponent) ancestors.push(parent)
+            if (fiber === parent) {
+                reset()
+                update(fiber)
+                return
+            }
             parent = parent.parent
         }
-        let common = fiber
-        while (ancestors.indexOf(common) === -1) common = common.parent
-        reset()
-        update(common)
+        // Descendant or other branch
+        queue.update.push(fiber)
         return
     }
 
@@ -59,6 +62,8 @@ function reset() {
     deletions.length = 0
     queue.sync.length = 0
     for (const res of queue.reset) res()
+    if (!syncOnly) concurrent = true
+    hydration = false
 }
 
 /**
@@ -70,6 +75,7 @@ function render(deadline) {
         while (next) next = reconcile(current = next)
         return commit()
     }
+
     // Timed loop (concurrent)
     while (deadline.timeRemaining() > 0 && next) next = reconcile(current = next)
     if (!next) return commit()
@@ -81,20 +87,16 @@ function render(deadline) {
  * Returns the next fiber to render.
  */
 function reconcile(fiber) {
-    switch (true) {
-        case fiber.isComponent:
-            resetCursor()
-            reconcileChildren(fiber, normalize(fiber.type(fiber.props)), fiber.tag)
-            break
+    const type = fiber.type
 
-        case fiber.type === Text:
-        case fiber.type === Inline:
-            if (!fiber.node && isBrowser && !hydration) fiber.createNode()
-            break
-
-        default:
-            if (!fiber.node && isBrowser && !hydration) fiber.createNode()
+    if (fiber.isComponent) {
+        resetCursor()
+        reconcileChildren(fiber, normalize(type(fiber.props)), fiber.tag)
+    } else {
+        if (!fiber.node && isBrowser && !hydration) fiber.createNode()
+        if (type !== Text && type !== Inline) {
             reconcileChildren(fiber, fiber.props.children)
+        }
     }
 
     if (fiber.child) return fiber.child
@@ -257,7 +259,7 @@ function reconcileChildren(parent, elements = [], parentTag) {
             }
 
             // Alternate exists but element does not
-            scheduleDeletion(true)
+            deletions.push(alt)
             alt = alt.sibling
             continue
         }
@@ -302,12 +304,14 @@ function commit() {
 
     // Relace the alternate from the main tree with the updated fiber
     if (root.parent) {
-        root.sibling = root.alt.sibling
-        if (root.alt.parent.child === root.alt) {
-            root.alt.parent.child = root
+        const alt = root.alt
+        const altParent = alt.parent
+        root.sibling = alt.sibling
+        if (altParent.child === alt) {
+            altParent.child = root
         } else {
-            let prev = root.alt.parent.child
-            while (prev.sibling !== root.alt) prev = prev.sibling
+            let prev = altParent.child
+            while (prev.sibling !== alt) prev = prev.sibling
             prev.sibling = root
         }
     }
@@ -335,8 +339,13 @@ function commit() {
 
     // Done
     reset()
-    if (!syncOnly) concurrent = true
-    hydration = false
+    const updateQueue = queue.update
+    queue.update = []
+    for (let i=updateQueue.length-1; i>=0; i--) {
+        concurrent = false
+        const fiber = updateQueue[i].hooks.fiber
+        fiber && update(fiber)
+    }
 }
 
 function scheduleNextEffect() {

@@ -1,15 +1,14 @@
 import { current, update, queue } from './renderer'
 import { getMethods } from '../utils'
 
-export default function Hooks() {
+export default function Hooks(fiber) {
+    this.fiber = fiber
     this.states = []
     this.effects = []
-    this.stores = new Set
 }
 
 let cursor = 0
 export const resetCursor = _ => cursor = 0
-
 const same = (prev, next) => prev
     && prev.length === next.length
     && prev.every((p, i) => Object.is(p, next[i]))
@@ -21,18 +20,24 @@ export const useState = initial => useReducer(false, initial)
 
 export function useReducer(reducer, initialState) {
     const i = cursor++
-    const fiber = current
     const hooks = current.hooks
     const states = hooks.states
-    const state = i in states ? states[i] : (states[i] = initialState)
-    if (reducer) return [state, (action) => {
-        states[i] = reducer(state, action)
-        update(fiber)
-    }]
-    return [state, (data) => {
-        states[i] = (typeof data === 'function') ? data(state) : data
-        update(fiber)
-    }]
+    if (i in states) return states[i]
+    const state = [
+        initialState,
+        reducer
+            ? (action) => {
+                if (!hooks.fiber) return
+                state[0] = reducer(state[0], action)
+                update(hooks.fiber)
+            }
+            : (data) => {
+                if (!hooks.fiber) return
+                state[0] = (typeof data === 'function') ? data(state[0]) : data
+                update(hooks.fiber)
+            }
+    ]
+    return  states[i] = state
 }
 
 export function useRef(initial = null) {
@@ -96,47 +101,44 @@ function _useEffect(fn, deps, sync) {
 /**
  * Store
  */
-export const storesWatchers = new Map
+const storesWatchers = new WeakMap
 
-export function createStore(ClassName) {
-    const watchers = new Set
-
+export function createStore(StoreClass, ...args) {
     // Wrap non-static methods (including extended ones)
-    let depth = 0
-    getMethods(ClassName).forEach(m => {
-        const action = ClassName.prototype[m]
-        ClassName.prototype[m] = function() {
-            depth++
-            const result = action.apply(this, arguments)
-            depth--
-            if (depth === 0 && result !== null) watchers.forEach(fiber => update(fiber))
-            return depth === 0 ? this : result
-        }
-    })
-
-    // Define the reserved "action" method
-    ClassName.prototype.action = (fn) => {
-        fn && fn()
-        watchers.forEach(fiber => update(fiber))
+    if (!StoreClass.__ley) {
+        let depth = 0
+        getMethods(StoreClass).forEach((m) => {
+            const action = StoreClass.prototype[m]
+            StoreClass.prototype[m] = function() {
+                depth++
+                const result = action.apply(this, arguments)
+                depth--
+                if (depth === 0 && result !== null) this.action()
+                return depth === 0 ? this : result
+            }
+        })
+        StoreClass.__ley = true
     }
-
-    // Set up the store
-    const store = new ClassName
+    // Set up the store and watchers list
+    const watchers = new Set
+    const store = new StoreClass(...args)
+    store.action = (fn) => {
+        fn && fn()
+        new Set(watchers)
+            .forEach(([fiber, condition]) => condition
+                ? condition() && update(fiber)
+                : update(fiber)
+            )
+    }
     storesWatchers.set(store, watchers)
     return store
 }
 
-export function useStore(store) {
-    const fiber = current
+export function useStore(store, condition) {
     const watchers = storesWatchers.get(store)
+    const entry = [current, condition]
     useLayoutEffect(() => {
-        if (fiber.alt) {
-            watchers.delete(fiber.alt)
-            watchers.add(fiber)
-        } else {
-            fiber.hooks.stores.add(store)
-            watchers.add(fiber)
-        }
-        return () => watchers.delete(fiber)
+        watchers.add(entry)
+        return () => watchers.delete(entry)
     })
 }

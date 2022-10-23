@@ -4,6 +4,7 @@ import { queue, hydration } from "./renderer"
 import { isBrowser } from '../utils'
 
 export const isReserved = prop => (prop === 'children' || prop === 'html')
+const isEventListener = prop => (prop[0] === 'o' && prop[1] === 'n')
 export const TAG_SKIP   = 0
 export const TAG_INSERT = 1
 
@@ -24,7 +25,7 @@ export default class Fiber {
         this.alt = null
         this.tag = tag
         this.replace = replace
-        this.hooks = this.isComponent ? new Hooks : null
+        this.hooks = this.isComponent ? new Hooks(this) : null
     }
 
     clone(parent, pendingProps, tag, replace) {
@@ -37,7 +38,7 @@ export default class Fiber {
         fiber.key = this.key
         fiber.alt = this
         fiber.tag = tag
-        fiber.replace = replace
+        fiber.replace = replace?.isComponent ? null : replace
         fiber.hooks = this.hooks
         return fiber
     }
@@ -54,12 +55,14 @@ export default class Fiber {
      */
     update(nodeCursor) {
         if (this.isComponent) {
-            this.hooks.effects.forEach(e => {
-                e.fn && (e.sync ? queue.sync.push(e.fn) : queue.async.push(e.fn))
-            })
+            const hooks = this.hooks
+            hooks.fiber = this
+            for (const e of hooks.effects) {
+                e && e.fn && (e.sync ? queue.sync.push(e.fn) : queue.async.push(e.fn))
+            }
             return
         }
-        
+
         if (hydration) {
             this.node = nodeCursor
             if (this.type === Text) {
@@ -72,19 +75,18 @@ export default class Fiber {
 
         this.updateNode()
 
-        if (!this.tag) return
-
-        // TAG_INSERT
-        const parentNode = this.getParentNode()
-        const replace = this.replace
-        if (replace && !replace.isComponent) {
-            parentNode.replaceChild(this.node, replace.node)
-            return
+        if (this.tag === TAG_INSERT) {
+            const parentNode = this.getParentNode()
+            const replace = this.replace
+            if (replace) {
+                parentNode.replaceChild(this.node, replace.node)
+                return
+            }
+            const relNode = nodeCursor
+                ? nodeCursor.nextSibling
+                : parentNode.firstChild
+            parentNode.insertBefore(this.node, relNode)
         }
-        const relNode = nodeCursor
-            ? nodeCursor.nextSibling
-            : parentNode.firstChild
-        parentNode.insertBefore(this.node, relNode)
     }
 
     /**
@@ -96,7 +98,7 @@ export default class Fiber {
             this.node.nodeValue = this.props.value
             return
         }
-        if (this.props.hasOwnProperty('html')) {
+        if ('html' in this.props) {
             const node = elements.div.cloneNode()
             node.innerHTML = this.type
             this.node = node.firstChild
@@ -114,6 +116,7 @@ export default class Fiber {
         const nextProps = this.props
 
         if (this.type === Text) {
+            if (hydration) return
             if (String(nextProps.value) !== node.nodeValue) {
                 node.nodeValue = nextProps.value
             }
@@ -129,20 +132,18 @@ export default class Fiber {
 
             // Unset Ref
             if (prop === 'ref') {
-                value.hasOwnProperty('current')
-                    ? value.current = null
-                    : value(null)
+                value(null)
                 continue
             }
 
             // Unset event listener
-            if (/^on.+/i.test(prop)) {
+            if (isEventListener(prop)) {
                 node[prop.toLowerCase()] = null
                 continue
             }
 
             // Skip props that will remain
-            if (nextProps.hasOwnProperty(prop)) continue
+            if (prop in nextProps) continue
 
             // Remove attribute
             node.removeAttribute(prop)
@@ -155,20 +156,18 @@ export default class Fiber {
 
             // Ref
             if (prop === 'ref') {
-                value.hasOwnProperty('current')
-                    ? value.current = node
-                    : value(node)
+                value(node)
                 continue
             }
 
             // Event listener
-            if (/^on.+/i.test(prop)) {
+            if (isEventListener(prop)) {
                 node[prop.toLowerCase()] = value
                 continue
             }
 
             // Skip same values
-            if (prevProps.hasOwnProperty(prop) && prevProps[prop] === value) {
+            if ((prop in prevProps) && prevProps[prop] === value) {
                 continue
             }
 
@@ -197,7 +196,9 @@ export default class Fiber {
         }
         this.walkDepth(fiber => {
             if (!fiber.isComponent) return
-            this.hooks.effects.forEach(e => e.cleanup && e.cleanup())
+            const hooks = this.hooks
+            hooks.fiber = null
+            for (const e of hooks.effects) e && e.cleanup && e.cleanup()
         })
         const childNodes = this.getChildNodes()
         for (const node of childNodes) node.parentNode.removeChild(node)

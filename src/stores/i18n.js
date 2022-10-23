@@ -1,5 +1,5 @@
-import { getCookie } from '../utils'
 import { createStore } from '../ui/Hooks'
+import { getCookie } from '../utils'
 
 class I18n {
 

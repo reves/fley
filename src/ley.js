@@ -7,9 +7,9 @@ export default function ley(children, container = document.body) {
     update(new Fiber( new Element(null, { children }), container ))
 }
 
-export function leySync(...args) {
+export function leySync() {
     setSyncOnly()
-    ley(...args)
+    ley.apply(null, arguments)
 }
 
 export {

@@ -9,9 +9,7 @@ export const Text = 2
  * JSX Element
  */
 export default function Element(type, props, key) {
-    if (props.hasOwnProperty('children')) {
-        props.children = normalize(props.children)
-    }
+    if ('children' in props) props.children = normalize(props.children)
     this.type = type
     this.props = props
     this.key = key?.toString()
