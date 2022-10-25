@@ -1,5 +1,5 @@
 import { createStore } from '../ui/Hooks'
-import { getCookie } from '../utils'
+import { getCookie, isBrowser } from '../utils'
 
 class I18n {
 
@@ -14,6 +14,7 @@ class I18n {
 
     define(locales = {}) {
         I18n.locales = locales
+        if (!isBrowser) return
 
         // The fallback locale will be the first defined in the locales object
         let fallbackCode = ''
@@ -35,9 +36,11 @@ class I18n {
 
     setLocale(code) {
         if (this.code === code) return null
-        if (!I18n.locales.hasOwnProperty(code)) return null
-        document.cookie = 'lang=' + code + ';path=/;max-age=31536000;secure;samesite=Lax'
-        document.documentElement.setAttribute('lang', code)
+        if (!(code in I18n.locales)) return null
+        if (isBrowser) {
+            document.cookie = 'lang=' + code + ';path=/;max-age=31536000;secure;samesite=Lax'
+            document.documentElement.setAttribute('lang', code)
+        }
         this.code = code
         this.locale = I18n.locales[code]
         this.plural = this.locale.$?.plural ?? (n => n == 1 ? 0 : 1)

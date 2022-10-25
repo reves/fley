@@ -2,6 +2,7 @@ import Fiber, { isReserved } from '../ui/Fiber'
 import Element, { Text } from '../ui/Element'
 import { update } from '../ui/renderer'
 import router from '../stores/router'
+import i18n, { getLocales } from '../stores/i18n'
 import head from '../ui/head'
 
 const voidElements = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'source', 'track', 'wbr']
@@ -24,16 +25,31 @@ function RouteDOM(head, root) {
 }
 
 export default function renderStatic(children) {
-    const routes = { ...router.routes, '': new RegExp }
+    const routes = { ...router.routes, "": new RegExp }
+    const locales = getLocales().map(([code, _]) => code)
+
     for (const name in routes) {
         router.name = name
         const routeRegex = routes[name]
-        const [root, reset] = update(new Fiber(new Element(null, { children })))
+        let dom = {}
+
+        if (locales.length) {
+            for (const locale of locales) {
+                if (!i18n.setLocale(locale)) continue
+                const [root, reset] = update(new Fiber(new Element(null, { children })))
+                dom[locale] = new RouteDOM(head, root)
+                reset()
+            }
+        } else {
+            const [root, reset] = update(new Fiber(new Element(null, { children })))
+            dom = new RouteDOM(head, root)
+            reset()
+        }
+
         routes[name] = new Route(
             new RouteRegex(routeRegex.source, routeRegex.flags),
-            new RouteDOM(head, root)
+            dom
         )
-        reset()
     }
     return routes
 }

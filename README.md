@@ -729,10 +729,10 @@ handler.abort()
 
 ## Pre-rendering (SSR)
 1. Compile at build time a static HTML page for each defined route
-2. Match the route and serve the corresponding HTML from the server
+2. Match the route and serve corresponding HTML from the server
 4. Hydrate on the client side
 
-A template engine can be used on the server side to include data. This can be achieved by first setting the initial state values to template variables in the application:
+A template engine can be used on the server side to include the data. This can be achieved by first setting the initial state values to template variables in the application:
 ```javascript
 const [title, setTitle] = useState('{{article.title}}')
 ```
@@ -788,7 +788,7 @@ Example of the resulting `routes` object:
         dom: { /* ... */ }
     },
 
-    // Additional empty key for mismatch case (when route.name === '')
+    // Additional empty key for mismatch case (when router.name === '')
     "": { 
         regex: { source: '(?:)', flags: '' },
         dom: {
