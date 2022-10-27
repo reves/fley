@@ -22,5 +22,5 @@ export {
     useCallback,
     useStore,
     createStore
-} from './ui/Hooks'
+} from './ui/hooks'
 export { Fragment, Inline } from './ui/Element'

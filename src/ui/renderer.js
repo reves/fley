@@ -1,6 +1,6 @@
 import Fiber, { TAG_SKIP, TAG_INSERT } from './Fiber'
 import { Text, Inline, normalize } from './Element'
-import { resetCursor } from './Hooks'
+import { resetCursor } from './hooks'
 import { isBrowser } from '../utils'
 
 let syncOnly = false
@@ -61,6 +61,7 @@ function reset() {
     current = null
     deletions.length = 0
     queue.sync.length = 0
+    queue.update = []
     for (const res of queue.reset) res()
     if (!syncOnly) concurrent = true
     hydration = false
@@ -330,7 +331,7 @@ function commit() {
         fiber.reset()
     })
 
-    // Produce sync effects queued in the "update" step
+    // Produce sync effects queued in the "Update DOM" step
     for (const effect of sync) effect()
     sync.length = 0
 
@@ -338,12 +339,11 @@ function commit() {
     scheduleNextEffect()
 
     // Done
-    reset()
     const updateQueue = queue.update
-    queue.update = []
+    reset()
     for (let i=updateQueue.length-1; i>=0; i--) {
         concurrent = false
-        const fiber = updateQueue[i].hooks.fiber
+        const fiber = updateQueue[i]
         fiber && update(fiber)
     }
 }

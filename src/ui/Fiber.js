@@ -1,10 +1,9 @@
 import { Text } from './Element'
-import Hooks from "./Hooks"
 import { queue, hydration } from "./renderer"
 import { isBrowser } from '../utils'
 
 export const isReserved = prop => (prop === 'children' || prop === 'html')
-const isEventListener = prop => (prop[0] === 'o' && prop[1] === 'n')
+export const isEventListener = prop => (prop[0] === 'o' && prop[1] === 'n')
 export const TAG_SKIP   = 0
 export const TAG_INSERT = 1
 
@@ -25,7 +24,8 @@ export default class Fiber {
         this.alt = null
         this.tag = tag
         this.replace = replace
-        this.hooks = this.isComponent ? new Hooks(this) : null
+        this.states = this.isComponent ? [] : null
+        this.effects = this.isComponent ? [] : null
     }
 
     clone(parent, pendingProps, tag, replace) {
@@ -39,7 +39,8 @@ export default class Fiber {
         fiber.alt = this
         fiber.tag = tag
         fiber.replace = replace?.isComponent ? null : replace
-        fiber.hooks = this.hooks
+        fiber.states = this.states
+        fiber.effects = this.effects
         return fiber
     }
 
@@ -55,9 +56,7 @@ export default class Fiber {
      */
     update(nodeCursor) {
         if (this.isComponent) {
-            const hooks = this.hooks
-            hooks.fiber = this
-            for (const e of hooks.effects) {
+            for (const e of this.effects) {
                 e && e.fn && (e.sync ? queue.sync.push(e.fn) : queue.async.push(e.fn))
             }
             return
@@ -196,9 +195,7 @@ export default class Fiber {
         }
         this.walkDepth(fiber => {
             if (!fiber.isComponent) return
-            const hooks = this.hooks
-            hooks.fiber = null
-            for (const e of hooks.effects) e && e.cleanup && e.cleanup()
+            for (const e of this.effects) e && e.cleanup && e.cleanup()
         })
         const childNodes = this.getChildNodes()
         for (const node of childNodes) node.parentNode.removeChild(node)

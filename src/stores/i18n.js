@@ -1,4 +1,4 @@
-import { createStore } from '../ui/Hooks'
+import { createStore } from '../ui/hooks'
 import { getCookie, isBrowser } from '../utils'
 
 class I18n {

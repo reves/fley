@@ -1,4 +1,4 @@
-import Fiber, { isReserved } from '../ui/Fiber'
+import Fiber, { isReserved, isEventListener } from '../ui/Fiber'
 import Element, { Text } from '../ui/Element'
 import { update } from '../ui/renderer'
 import router from '../stores/router'
@@ -80,9 +80,7 @@ function propsToString(fiber) {
     let result = ''
     const props = fiber.props
     for (const prop in props) {
-        if (isReserved(prop)) continue
-        if (prop === 'ref') continue
-        if (/^on.+/i.test(prop)) continue
+        if (isReserved(prop) || isEventListener(prop) || prop === 'ref') continue
         const value = props[prop]
         if (typeof value === 'boolean' && value) {
             result += ` ${prop}`

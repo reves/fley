@@ -1,12 +1,6 @@
 import { current, update, queue } from './renderer'
 import { getMethods } from '../utils'
 
-export default function Hooks(fiber) {
-    this.fiber = fiber
-    this.states = []
-    this.effects = []
-}
-
 let cursor = 0
 export const resetCursor = _ => cursor = 0
 const same = (prev, next) => prev
@@ -14,35 +8,30 @@ const same = (prev, next) => prev
     && prev.every((p, i) => Object.is(p, next[i]))
 
 /**
- * State
+ * States
  */
 export const useState = initial => useReducer(false, initial)
 
 export function useReducer(reducer, initialState) {
     const i = cursor++
-    const hooks = current.hooks
-    const states = hooks.states
-    if (i in states) return states[i]
-    const state = [
-        initialState,
-        reducer
+    const fiber = current
+    const states = fiber.states
+    const state = i in states ? states[i] : (states[i] = initialState)
+    return [ state, reducer
             ? (action) => {
-                if (!hooks.fiber) return
-                state[0] = reducer(state[0], action)
-                update(hooks.fiber)
+                states[i] = reducer(state, action)
+                update(fiber)
             }
             : (data) => {
-                if (!hooks.fiber) return
-                state[0] = (typeof data === 'function') ? data(state[0]) : data
-                update(hooks.fiber)
+                states[i] = (typeof data === 'function') ? data(state) : data
+                update(fiber)
             }
     ]
-    return  states[i] = state
 }
 
 export function useRef(initial = null) {
     const i = cursor++
-    const states = current.hooks.states
+    const states = current.states
     if (i in states) return states[i]
     const ref = function(value) {
         if (arguments.length) ref.current = value
@@ -54,7 +43,7 @@ export function useRef(initial = null) {
 
 export function useMemo(fn, deps) {
     const i = cursor++
-    const states = current.hooks.states
+    const states = current.states
     const memo = states[i] ??= []
     if (same(memo[1], deps)) return memo[0]
     memo[1] = deps
@@ -64,7 +53,7 @@ export function useMemo(fn, deps) {
 export const useCallback = (fn, deps) => useMemo(() => fn, deps)
 
 /**
- * Effect
+ * Effects
  */
 function Effect(sync = false) {
     this.sync = sync
@@ -77,7 +66,7 @@ export const useEffect = (fn, deps) => _useEffect(fn, deps)
 export const useLayoutEffect = (fn, deps) => _useEffect(fn, deps, true)
 
 function _useEffect(fn, deps, sync) {
-    const effect = current.hooks.effects[cursor++] ??= new Effect(sync)
+    const effect = current.effects[cursor++] ??= new Effect(sync)
     if (same(effect.deps, deps)) {
         effect.fn = null
         return
@@ -99,36 +88,35 @@ function _useEffect(fn, deps, sync) {
 }
 
 /**
- * Store
+ * Stores
  */
 const storesWatchers = new WeakMap
 
 export function createStore(StoreClass, ...args) {
-    // Wrap non-static methods (including extended ones)
     if (!StoreClass.__ley) {
+        // Wrap non-static methods (including extended ones)
+        StoreClass.__ley = true
         let depth = 0
-        getMethods(StoreClass).forEach((m) => {
-            const action = StoreClass.prototype[m]
-            StoreClass.prototype[m] = function() {
+        for (const method of getMethods(StoreClass)) {
+            const action = StoreClass.prototype[method]
+            StoreClass.prototype[method] = function() {
                 depth++
                 const result = action.apply(this, arguments)
                 depth--
                 if (depth === 0 && result !== null) this.action()
                 return depth === 0 ? this : result
             }
-        })
-        StoreClass.__ley = true
+        }
     }
     // Set up the store and watchers list
     const watchers = new Set
     const store = new StoreClass(...args)
     store.action = (fn) => {
         fn && fn()
-        new Set(watchers)
-            .forEach(([fiber, condition]) => condition
-                ? condition() && update(fiber)
-                : update(fiber)
-            )
+        new Set(watchers).forEach(([fiber, condition]) => condition
+            ? condition() && update(fiber)
+            : update(fiber)
+        )
     }
     storesWatchers.set(store, watchers)
     return store
