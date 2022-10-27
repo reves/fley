@@ -192,12 +192,23 @@ const memoizedCallback = useCallback(fn, [deps])
 
 ### useStore
 ```javascript
-useStore(store)
+useStore(store, condition)
 ```
 ```javascript
 function Component() {
     useStore(router)
     return <div>The current route is {router.name}</div>
+}
+```
+If the condition is set, the component will be updated only if the condition returns true.
+```javascript
+function Item({ id }) {
+    useStore(selector, () => selector.id === id || selector.lastId === id)
+    // useStore(selector, (store) => store.id === id || store.lastId === id)
+
+    return <div class={selector.id === id ? 'selected' : ''}>
+        <a onClick={selector.select(id)}>Item</a>
+    </div>
 }
 ```
 
@@ -260,7 +271,7 @@ A ___store___ is an object that contains a ___state___ (properties) and its ___a
 
 ### createStore
 ```javascript
-const store = createStore(ClassName)
+const store = createStore(ClassName, ...constructorArgs)
 ```
 ```javascript
 import ley, { createStore, useStore } from 'ley'
@@ -799,6 +810,18 @@ Example of the resulting `routes` object:
         }
     }
 }
+
+// If i18n was used
+{   
+    home: {
+        regex: /* ... */,
+        dom: {
+            'en': { title: 'Home page', /* ... */ },
+            'ro': { title: 'Pagina principală', /* ... */ },
+        }
+    },
+    /* ... */
+}
 ```
 ####  4. Save the content of the `routes` object on the server
 ```javascript
@@ -833,33 +856,37 @@ fs.writeFileSync(`${serverPath}/routes.json`, JSON.stringify(routes))
 const { execSync } = require('child_process')
 const path = require('path')
 const fs = require('fs')
-const minify = require('html-minifier').minify
-const minifyConfig = {
-    collapseWhitespace: true,
-    ignoreCustomFragments: [/{{[\s\S]*?}}/],
-    trimCustomFragments: true
-}
-const templateFile = path.resolve(__dirname, './index.html')
-const templateString = fs.readFileSync(templateFile).toString()
-const template = minify(templateString, minifyConfig)
-const render = require("handlebars").compile(template, { noEscape: true })
 
 const outputPath = path.resolve(__dirname, './dist')
 const outputFile = 'js/main.js'
 const serverPath = path.resolve(__dirname, '../server')
+const templateFile = path.resolve(__dirname, './index.html')
+const template = fs.readFileSync(templateFile).toString()
+const render = require("handlebars").compile(template, { noEscape: true })
 
 const compilePlugin = {
-    apply: compiler => compiler.hooks.afterEmit.tap('MyCompilePlugin', (compilation) => {
+    apply: compiler => compiler.hooks.afterEmit.tap('MyRenderPlugin', (compilation) => {
+        const bundle = compilation.getAssets().find(a => a.name.startsWith(outputFile)).name
         const result = execSync(`node ${outputPath}/${outputFile}`).toString()
         const routes = JSON.parse(result)
-        const bundle = compilation.getAsset(outputFile).name
 
-        // Render a static HTML page for each route using "Handlebars"
-        // package and the minified template "index.html"
+        // Render static HTML page for each route (and locale) using
+        // "Handlebars" package and the "index.html" template
         for (const name in routes) {
-            // For convenience, assign the compiled static HTML
-            // to the "dom" property of the `routes` object
-            routes[name].dom = render({ bundle, ...routes[name].dom })
+            const route = routes[name]
+            const dom = route.dom
+
+            if ('content' in dom) {
+                // For convenience, assign the compiled static HTML
+                // to the "dom" property of the `route` object
+                route.dom = render({ bundle, ...dom })
+                continue
+            }
+
+            // If i18n was used
+            for (const locale in dom) {
+                route.dom[locale] = render({ bundle, ...dom[locale] })
+            }
         }
 
         // Store the `routes` object on the server

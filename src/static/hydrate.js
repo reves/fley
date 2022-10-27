@@ -1,18 +1,17 @@
 import Fiber from '../ui/Fiber'
 import Element from '../ui/Element'
-import { update, setSyncOnly } from '../ui/renderer'
-import { isBrowser } from '../utils'
+import { update } from '../ui/renderer'
 import renderStatic from './renderStatic'
+import { isBrowser } from '../utils'
 
 export default function hydrate(children, container) {
-    if (!isBrowser) {
-        setSyncOnly()
-        try { console.log(JSON.stringify(renderStatic(children))) }
-        catch (e) { console.error(e) }
+    if (isBrowser) {
+        container = container || document.body
+        update(new Fiber( new Element(null, { children }), container ), true)
         return
     }
-    container = container || document.body
-    update(new Fiber( new Element(null, { children }), container ), true)
+    try { renderStatic(children) }
+    catch (e) { console.error(e) }
 }
 
 export { isBrowser } from '../utils'

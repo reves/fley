@@ -114,7 +114,7 @@ export function createStore(StoreClass, ...args) {
     store.action = (fn) => {
         fn && fn()
         new Set(watchers).forEach(([fiber, condition]) => condition
-            ? condition() && update(fiber)
+            ? condition(store) && update(fiber)
             : update(fiber)
         )
     }

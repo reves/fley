@@ -1,36 +1,28 @@
-import Fiber, { isReserved, isEventListener } from '../ui/Fiber'
+import Fiber, { isReserved } from '../ui/Fiber'
 import Element, { Text } from '../ui/Element'
-import { update } from '../ui/renderer'
+import { update, setSyncOnly } from '../ui/renderer'
 import router from '../stores/router'
 import i18n, { getLocales } from '../stores/i18n'
 import head from '../ui/head'
 
 const voidElements = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'source', 'track', 'wbr']
 
-function Route(regex, dom) {
-    this.regex = regex
-    this.dom = dom
-}
-
-function RouteRegex(source, flags) {
-    this.source = source
-    this.flags = flags
-}
-
-function RouteDOM(head, root) {
-    this.title = titleToString(head.title)
-    this.meta = metaToString(head.meta)
-    this.schema = schemaToString(head.schema)
-    this.content = rootToString(root)
-}
-
 export default function renderStatic(children) {
+
+    function RouteDOM(head, root) {
+        this.title = titleToString(head.title)
+        this.meta = metaToString(head.meta)
+        this.schema = schemaToString(head.schema)
+        this.content = rootToString(root)
+    }
     const routes = { ...router.routes, "": new RegExp }
     const locales = getLocales().map(([code, _]) => code)
 
+    setSyncOnly()
+
     for (const name in routes) {
         router.name = name
-        const routeRegex = routes[name]
+        const regex = routes[name]
         let dom = {}
 
         if (locales.length) {
@@ -46,12 +38,13 @@ export default function renderStatic(children) {
             reset()
         }
 
-        routes[name] = new Route(
-            new RouteRegex(routeRegex.source, routeRegex.flags),
+        routes[name] = {
+            regex: { source: regex.source, flags: regex.flags },
             dom
-        )
+        }
     }
-    return routes
+
+    console.log(JSON.stringify(routes))
 }
 
 function rootToString(root) {
@@ -80,7 +73,9 @@ function propsToString(fiber) {
     let result = ''
     const props = fiber.props
     for (const prop in props) {
-        if (isReserved(prop) || isEventListener(prop) || prop === 'ref') continue
+        if (isReserved(prop)) continue
+        if (prop === 'ref') continue
+        if (/^on.+/i.test(prop)) continue
         const value = props[prop]
         if (typeof value === 'boolean' && value) {
             result += ` ${prop}`
