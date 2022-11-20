@@ -739,15 +739,16 @@ handler.abort()
 ```
 
 ## Pre-rendering (SSR)
+### General idea
 1. Compile at build time a static HTML page for each defined route
-2. Match the route and serve corresponding HTML from the server
+2. On the server, match the route and serve corresponding static HTML
 4. Hydrate on the client side
 
 A template engine can be used on the server side to include the data. This can be achieved by first setting the initial state values to template variables in the application:
 ```javascript
 const [title, setTitle] = useState('{{article.title}}')
 ```
-
+### Guide
 #### 1. Replace `ley()` with `hydrate()` in `index.jsx`
 ```javascript
 import hydrate, { isBrowser } from 'ley/hydrate'
@@ -832,7 +833,7 @@ fs.writeFileSync(`${serverPath}/routes.json`, JSON.stringify(routes))
 
 ####  5. Set up the server to serve the HTML of the corresponding route
 
-### Example using Webpack
+### Final example
 `index.html` – The main HTML template.
 ```html
 <!doctype html>
@@ -899,7 +900,7 @@ module.exports = {
     plugins: [ compilePlugin, ]
 }
 ```
-`index.php` – The server matches the current request URL path against the regex of each route until finds and returns the corresponding static HTML page.
+`index.php` – The server matches the current request URL path against the regex of each route until finds and returns the corresponding static HTML page. The hydration will happen on the client side.
 ```php
 <?php
 $routes = json_decode(file_get_contents("./routes.json"), true);
@@ -914,4 +915,3 @@ foreach ($routes as $name => $route) {
     }
 }
 ```
-Finally, the hydration is performed on the client side.

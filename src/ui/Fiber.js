@@ -15,6 +15,7 @@ export default class Fiber {
     constructor(element, node, parent, tag, replace) {
         this.type = element?.type
         this.isComponent = (typeof this.type === 'function')
+        this.obsolete = false
         this.node = node
         this.props = element?.props
         this.parent = parent
@@ -41,6 +42,29 @@ export default class Fiber {
         fiber.replace = replace?.isComponent ? null : replace
         fiber.states = this.states
         fiber.effects = this.effects
+
+        /* if (tag == null && pendingProps) {
+            const prev = Object.keys(this.props)
+            const next = Object.keys(pendingProps)
+            const len = prev.length
+            if (len === next.length) {
+                let diff = false
+                for (let i=0; i<len; i++) {
+                    const keyPrev = prev[i]
+                    const keyNext = next[i]
+                    if (keyPrev !== keyNext || !Object.is(this.props[keyPrev], pendingProps[keyNext]) || (typeof this.props[keyPrev] === 'object')) {
+                        diff = true
+                        break
+                    }
+                }
+                if (!diff) {
+                    fiber.child = this.child
+                    fiber.tag = TAG_SKIP
+                    queue.skips.push(fiber)
+                }
+            }
+        } */
+
         return fiber
     }
 
@@ -56,6 +80,7 @@ export default class Fiber {
      */
     update(nodeCursor) {
         if (this.isComponent) {
+            this.alt && (this.alt.obsolete = true)
             for (const e of this.effects) {
                 e && e.fn && (e.sync ? queue.sync.push(e.fn) : queue.async.push(e.fn))
             }
@@ -195,6 +220,7 @@ export default class Fiber {
         }
         this.walkDepth(fiber => {
             if (!fiber.isComponent) return
+            fiber.obsolete = true
             for (const e of this.effects) e && e.cleanup && e.cleanup()
         })
         const childNodes = this.getChildNodes()
@@ -209,6 +235,7 @@ export default class Fiber {
         let goDeep = true
         let nodeCursor = hydration ? this.node : null
         const nodeStack = []
+        // let skipping = false
 
         const beforeChild = hydration
             ? () => nodeCursor = nodeCursor.firstChild ?? nodeCursor
@@ -232,16 +259,21 @@ export default class Fiber {
 
         while (true) {
             if (goDeep) {
-                parentFirst && parentFirst(fiber)
+                // if (fiber.tag === TAG_SKIP) skipping = true
+                parentFirst/*  && !skipping  */&& parentFirst(fiber)
                 if (fiber.child) {
                     if (!fiber.isComponent) beforeChild()
                     fiber = fiber.child
                     continue
                 }
             }
-            childFirst(fiber, nodeCursor)
+            /* if (!skipping)  */childFirst(fiber, nodeCursor)
             while (true) {
                 if (fiber === this) return
+                /* if (fiber.tag === TAG_SKIP) {
+                    skipping = false
+                    fiber.reset()
+                } */
                 if (fiber.sibling) {
                     if (!fiber.isComponent) beforeSibling()
                     fiber = fiber.sibling
