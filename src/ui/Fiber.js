@@ -51,6 +51,7 @@ export default class Fiber {
                 for (let i=0; i<len; i++) {
                     const keyPrev = prev[i]
                     const keyNext = next[i]
+                    const propValue = this.props[keyPrev]
                     if (
                         keyPrev !== keyNext ||
                         !Object.is(propValue, pendingProps[keyNext]) ||
@@ -63,7 +64,6 @@ export default class Fiber {
                 if (!diff) {
                     fiber.child = this.child
                     fiber.tag = TAG_SKIP
-                    queue.skips.push(fiber)
                 }
             }
         }
