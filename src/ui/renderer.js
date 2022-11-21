@@ -25,20 +25,17 @@ export let hydration = false
  * Initiates the rendering process of the fiber subtree.
  */
 export function update(fiber, hydrate = false) {
-    if (fiber.obsolete) {
-        console.log('obsolete called')
-        return
-    }
     hydration = hydrate
 
     // Already rendering
     if (root) {
         // Root itself or its ancestor
-        let parent = root.alt
+        const rootCurrent = root.alt
+        let parent = fiber
         while (parent) {
-            if (fiber === parent) {
+            if (rootCurrent === parent) {
                 reset()
-                update(fiber)
+                update(rootCurrent)
                 return
             }
             parent = parent.parent

@@ -15,7 +15,6 @@ export default class Fiber {
     constructor(element, node, parent, tag, replace) {
         this.type = element?.type
         this.isComponent = (typeof this.type === 'function')
-        this.obsolete = false
         this.node = node
         this.props = element?.props
         this.parent = parent
@@ -80,7 +79,6 @@ export default class Fiber {
      */
     update(nodeCursor) {
         if (this.isComponent) {
-            this.alt && (this.alt.obsolete = true)
             for (const e of this.effects) {
                 e && e.fn && (e.sync ? queue.sync.push(e.fn) : queue.async.push(e.fn))
             }
@@ -220,7 +218,6 @@ export default class Fiber {
         }
         this.walkDepth(fiber => {
             if (!fiber.isComponent) return
-            fiber.obsolete = true
             for (const e of this.effects) e && e.cleanup && e.cleanup()
         })
         const childNodes = this.getChildNodes()
