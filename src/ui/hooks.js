@@ -90,8 +90,6 @@ function _useEffect(fn, deps, sync) {
 /**
  * Stores
  */
-const storesWatchers = new WeakMap
-
 export function createStore(StoreClass, ...args) {
     if (!StoreClass.__ley) {
         // Wrap non-static methods (including extended ones)
@@ -109,21 +107,20 @@ export function createStore(StoreClass, ...args) {
         }
     }
     // Set up the store and watchers list
-    const watchers = new Set
     const store = new StoreClass(...args)
     store.action = (fn) => {
         fn && fn()
-        new Set(watchers).forEach(([fiber, condition]) => condition
+        new Set(store.action.__watchers).forEach(([fiber, condition]) => condition
             ? condition(store) && update(fiber)
             : update(fiber)
         )
     }
-    storesWatchers.set(store, watchers)
+    store.action.__watchers = new Set
     return store
 }
 
 export function useStore(store, condition) {
-    const watchers = storesWatchers.get(store)
+    const watchers = store.action.__watchers
     const entry = [current, condition]
     useLayoutEffect(() => {
         watchers.add(entry)

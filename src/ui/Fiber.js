@@ -42,7 +42,7 @@ export default class Fiber {
         fiber.states = this.states
         fiber.effects = this.effects
 
-        /* if (tag == null && pendingProps) {
+        if (this.key != null && tag == null && pendingProps) {
             const prev = Object.keys(this.props)
             const next = Object.keys(pendingProps)
             const len = prev.length
@@ -51,7 +51,11 @@ export default class Fiber {
                 for (let i=0; i<len; i++) {
                     const keyPrev = prev[i]
                     const keyNext = next[i]
-                    if (keyPrev !== keyNext || !Object.is(this.props[keyPrev], pendingProps[keyNext]) || (typeof this.props[keyPrev] === 'object')) {
+                    if (
+                        keyPrev !== keyNext ||
+                        !Object.is(propValue, pendingProps[keyNext]) ||
+                        (typeof propValue === 'object' && !propValue.constructor.__ley)
+                    ) {
                         diff = true
                         break
                     }
@@ -62,7 +66,7 @@ export default class Fiber {
                     queue.skips.push(fiber)
                 }
             }
-        } */
+        }
 
         return fiber
     }
@@ -232,7 +236,7 @@ export default class Fiber {
         let goDeep = true
         let nodeCursor = hydration ? this.node : null
         const nodeStack = []
-        // let skipping = false
+        let skipping = false
 
         const beforeChild = hydration
             ? () => nodeCursor = nodeCursor.firstChild ?? nodeCursor
@@ -256,21 +260,29 @@ export default class Fiber {
 
         while (true) {
             if (goDeep) {
-                // if (fiber.tag === TAG_SKIP) skipping = true
-                parentFirst/*  && !skipping  */&& parentFirst(fiber)
+                if (fiber.tag === TAG_SKIP) {
+                    skipping = true
+                    // Update relations of skipped fibers
+                    let child = fiber.child
+                    while (child) {
+                        child.parent = fiber
+                        child = child.sibling
+                    }
+                }
+                parentFirst && !skipping && parentFirst(fiber)
                 if (fiber.child) {
                     if (!fiber.isComponent) beforeChild()
                     fiber = fiber.child
                     continue
                 }
             }
-            /* if (!skipping)  */childFirst(fiber, nodeCursor)
+            if (!skipping) childFirst(fiber, nodeCursor)
             while (true) {
                 if (fiber === this) return
-                /* if (fiber.tag === TAG_SKIP) {
+                if (fiber.tag === TAG_SKIP) {
                     skipping = false
                     fiber.reset()
-                } */
+                }
                 if (fiber.sibling) {
                     if (!fiber.isComponent) beforeSibling()
                     fiber = fiber.sibling

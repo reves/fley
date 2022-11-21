@@ -16,8 +16,7 @@ export const queue = {
     sync: [],
     async: [],
     timeoutId: null,
-    reset: [],
-    // skips: []
+    reset: []
 }
 export let hydration = false
 
@@ -29,18 +28,27 @@ export function update(fiber, hydrate = false) {
 
     // Already rendering
     if (root) {
-        // Root itself or its ancestor
-        const rootCurrent = root.alt
-        let parent = fiber
-        while (parent) {
-            if (rootCurrent === parent) {
+        const rootAlt = root.alt
+        let rootParent = rootAlt
+        let fiberParent = fiber.parent
+
+        while (rootParent || fiberParent) {
+            // Fiber is the ancestor of root, or the root itself
+            if (rootParent === fiber) {
                 reset()
-                update(rootCurrent)
+                update(fiber)
                 return
             }
-            parent = parent.parent
+            // Fiber is a descendant of root
+            if (fiberParent === rootAlt) {
+                reset()
+                update(rootAlt)
+                return
+            }
+            rootParent = rootParent?.parent
+            fiberParent = fiberParent?.parent
         }
-        // Descendant or other branch
+        // Fiber is on another branch
         queue.update.push(fiber)
         return
     }
@@ -64,7 +72,6 @@ function reset() {
     deletions.length = 0
     queue.sync.length = 0
     queue.update = []
-    // queue.skips = []
     for (const res of queue.reset) res()
     if (!syncOnly) concurrent = true
     hydration = false
@@ -93,7 +100,7 @@ function render(deadline) {
 function reconcile(fiber) {
     const type = fiber.type
 
-    // if (fiber.tag !== TAG_SKIP) {
+    if (fiber.tag !== TAG_SKIP) {
         if (fiber.isComponent) {
             resetCursor()
             reconcileChildren(fiber, normalize(type(fiber.props)), fiber.tag)
@@ -103,9 +110,9 @@ function reconcile(fiber) {
                 reconcileChildren(fiber, fiber.props.children)
             }
         }
-    // }
+    }
 
-    if (fiber.child/*  && fiber.tag !== TAG_SKIP */) return fiber.child
+    if (fiber.child && fiber.tag !== TAG_SKIP) return fiber.child
     while (fiber) {
         if (fiber.sibling) return fiber.sibling
         if (fiber.parent === root) return null
@@ -289,7 +296,7 @@ function getSiblingByKey(fiber, key) {
 }
 
 function getElementByKey(elements, elementsLen, startIndex, key) {
-    for (let i=startIndex; i<elementsLen; i++) {
+    for (let i=elementsLen-1; i>=startIndex; i--) {
         if (elements[i].key === key) return elements[i]
     }
     return null
@@ -330,15 +337,6 @@ function commit() {
 
     // Deletetions
     for (const fiber of deletions) fiber.unmount()
-
-    // commit skips relations
-    /* for (const fiber of queue.skips) {
-        let child = fiber.child
-        while (child) {
-            child.parent = fiber
-            child = child.sibling
-        }
-    } */
 
     // Update DOM
     root.walkDepth((fiber, nodeCursor) => {
