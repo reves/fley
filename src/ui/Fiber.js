@@ -2,7 +2,7 @@ import { Text } from './Element'
 import { queue, hydration } from "./renderer"
 import { isBrowser } from '../utils'
 
-export const isReserved = prop => (prop === 'children' || prop === 'html')
+export const isReserved = prop => (prop === 'children' || prop === 'html' || prop === 'memo')
 export const isEventListener = prop => (prop[0] === 'o' && prop[1] === 'n')
 export const TAG_SKIP   = 0
 export const TAG_INSERT = 1
@@ -28,12 +28,12 @@ export default class Fiber {
         this.effects = this.isComponent ? [] : null
     }
 
-    clone(parent, pendingProps, tag, replace) {
+    clone(parent, nextProps, tag, replace) {
         const fiber = new Fiber
         fiber.type = this.type
         fiber.isComponent = this.isComponent
         fiber.node = this.node
-        fiber.props = pendingProps ?? this.props
+        fiber.props = nextProps ?? this.props
         fiber.parent = parent ?? this.parent
         fiber.key = this.key
         fiber.alt = this
@@ -42,29 +42,10 @@ export default class Fiber {
         fiber.states = this.states
         fiber.effects = this.effects
 
-        if (this.key != null && tag == null && pendingProps) {
-            const prev = Object.keys(this.props)
-            const next = Object.keys(pendingProps)
-            const len = prev.length
-            if (len === next.length) {
-                let diff = false
-                for (let i=0; i<len; i++) {
-                    const keyPrev = prev[i]
-                    const keyNext = next[i]
-                    const propValue = this.props[keyPrev]
-                    if (
-                        keyPrev !== keyNext ||
-                        !Object.is(propValue, pendingProps[keyNext]) ||
-                        (typeof propValue === 'object' && !propValue.constructor.__ley)
-                    ) {
-                        diff = true
-                        break
-                    }
-                }
-                if (!diff) {
-                    fiber.child = this.child
-                    fiber.tag = TAG_SKIP
-                }
+        if ('memo' in this.props && nextProps) {
+            const memo = this.props.memo
+            if (memo === true || memo(this.props, nextProps)) {
+                fiber.tag = TAG_SKIP
             }
         }
 
@@ -263,6 +244,7 @@ export default class Fiber {
                 if (fiber.tag === TAG_SKIP) {
                     skipping = true
                     // Update relations of skipped fibers
+                    fiber.child = fiber.alt.child
                     let child = fiber.child
                     while (child) {
                         child.parent = fiber
