@@ -26,9 +26,23 @@ export default class Fiber {
         this.replace = replace
         this.states = this.isComponent ? [] : null
         this.effects = this.isComponent ? [] : null
+        this.reuse = false
+        this.skip = false
     }
 
     clone(parent, nextProps, tag, replace) {
+        if ('memo' in this.props && nextProps) {
+            const memo = this.props.memo
+            if (memo === true || memo(this.props, nextProps)) {
+                // TODO: revert these and other "reuse" changes. E.g. in renderer reset()
+                // TODO: figure out how hot to revert tag.skip = [,] in reconciler
+                this.parent = parent
+                this.tag = tag
+                this.replace = replace?.isComponent ? null : replace
+                this.reuse = true
+                return this
+            }
+        }
         const fiber = new Fiber
         fiber.type = this.type
         fiber.isComponent = this.isComponent
@@ -41,14 +55,6 @@ export default class Fiber {
         fiber.replace = replace?.isComponent ? null : replace
         fiber.states = this.states
         fiber.effects = this.effects
-
-        if ('memo' in this.props && nextProps) {
-            const memo = this.props.memo
-            if (memo === true || memo(this.props, nextProps)) {
-                fiber.tag = TAG_SKIP
-            }
-        }
-
         return fiber
     }
 
@@ -57,12 +63,15 @@ export default class Fiber {
         this.tag = null
         this.replace = null
         this.props.children &&= null
+        this.reuse = false
+        this.skip = false
     }
 
     /**
      * Applies changes to the DOM and manages side effects.
      */
     update(nodeCursor) {
+        if (this.parent?.isComponent) this.tag = this.parent.tag
         if (this.isComponent) {
             for (const e of this.effects) {
                 e && e.fn && (e.sync ? queue.sync.push(e.fn) : queue.async.push(e.fn))
@@ -203,7 +212,8 @@ export default class Fiber {
         }
         this.walkDepth(fiber => {
             if (!fiber.isComponent) return
-            for (const e of this.effects) e && e.cleanup && e.cleanup()
+            for (const e of fiber.effects) e && e.cleanup && e.cleanup()
+            fiber.effects = null
         })
         const childNodes = this.getChildNodes()
         for (const node of childNodes) node.parentNode.removeChild(node)
@@ -217,7 +227,7 @@ export default class Fiber {
         let goDeep = true
         let nodeCursor = hydration ? this.node : null
         const nodeStack = []
-        let skipping = false
+        let reusing = false
 
         const beforeChild = hydration
             ? () => nodeCursor = nodeCursor.firstChild ?? nodeCursor
@@ -241,28 +251,20 @@ export default class Fiber {
 
         while (true) {
             if (goDeep) {
-                if (fiber.tag === TAG_SKIP) {
-                    skipping = true
-                    // Update relations of skipped fibers
-                    fiber.child = fiber.alt.child
-                    let child = fiber.child
-                    while (child) {
-                        child.parent = fiber
-                        child = child.sibling
-                    }
-                }
-                parentFirst && !skipping && parentFirst(fiber)
+                // TODO: skip subtree of reusable fiber with tag insert (except fibers of getChildNodes())
+                if (fiber.reuse && fiber.tag == null) reusing = true
+                parentFirst && !reusing && parentFirst(fiber)
                 if (fiber.child) {
                     if (!fiber.isComponent) beforeChild()
                     fiber = fiber.child
                     continue
                 }
             }
-            if (!skipping) childFirst(fiber, nodeCursor)
+            if (!reusing) childFirst(fiber, nodeCursor)
             while (true) {
                 if (fiber === this) return
-                if (fiber.tag === TAG_SKIP) {
-                    skipping = false
+                if (fiber.reuse) {
+                    reusing = false
                     fiber.reset()
                 }
                 if (fiber.sibling) {

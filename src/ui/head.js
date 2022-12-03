@@ -11,9 +11,8 @@ isBrowser && (schemaNode.type = schemaType)
 class Head {
 
     constructor() {
-        this.managed = false
-        this.metaNodes = []
         this.reset()
+        this.metaNodes = []
         queue.reset.push(this.reset.bind(this))
     }
 

@@ -77,6 +77,7 @@ function _useEffect(fn, deps, sync) {
         effect.fn = () => {
             effect.cleanup = fn()
             effect.deps = deps
+            effect.fn = null
         }
         return
     }
@@ -84,6 +85,7 @@ function _useEffect(fn, deps, sync) {
         cleanup && cleanup()
         effect.cleanup = fn()
         effect.deps = deps
+        effect.fn = null
     }
 }
 

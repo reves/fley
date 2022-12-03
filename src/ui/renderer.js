@@ -1,4 +1,4 @@
-import Fiber, { TAG_SKIP, TAG_INSERT } from './Fiber'
+import Fiber, { TAG_INSERT } from './Fiber'
 import { Text, Inline, normalize } from './Element'
 import { resetCursor } from './hooks'
 import { isBrowser } from '../utils'
@@ -72,7 +72,6 @@ function reset() {
     deletions.length = 0
     queue.sync.length = 0
     queue.update = []
-    for (const res of queue.reset) res()
     if (!syncOnly) concurrent = true
     hydration = false
 }
@@ -100,10 +99,10 @@ function render(deadline) {
 function reconcile(fiber) {
     const type = fiber.type
 
-    if (fiber.tag !== TAG_SKIP) {
+    if (!fiber.reuse) {
         if (fiber.isComponent) {
             resetCursor()
-            reconcileChildren(fiber, normalize(type(fiber.props)), fiber.tag)
+            reconcileChildren(fiber, normalize(type(fiber.props)))
         } else {
             if (!fiber.node && isBrowser && !hydration) fiber.createNode()
             if (type !== Text && type !== Inline) {
@@ -112,7 +111,7 @@ function reconcile(fiber) {
         }
     }
 
-    if (fiber.child && fiber.tag !== TAG_SKIP) return fiber.child
+    if (fiber.child && !fiber.reuse) return fiber.child
     while (fiber) {
         if (fiber.sibling) return fiber.sibling
         if (fiber.parent === root) return null
@@ -124,7 +123,7 @@ function reconcile(fiber) {
  * Compares the existing child fibers to the new JSX elements and decides which 
  * changes to apply.
  */
-function reconcileChildren(parent, elements = [], parentTag) {
+function reconcileChildren(parent, elements = []) {
     const elementsLen = elements.length
     let i = 0
     let alt = parent.alt?.child
@@ -135,6 +134,7 @@ function reconcileChildren(parent, elements = [], parentTag) {
         if (!lookaheadElement && alt) alt = alt.sibling
         if (i === 0) { parent.child = fiber } else { prev.sibling = fiber }
         prev = fiber
+        prev.sibling = null
         i++
     }
     const scheduleDeletion = (obsolete = false) => 
@@ -154,8 +154,14 @@ function reconcileChildren(parent, elements = [], parentTag) {
         if (alt) {
 
             // Looked-ahead alternate
-            if (alt.tag === TAG_SKIP) {
-                alt.tag = null
+            if (alt.skip) {
+                if (alt.skip !== true) {
+                    const tmp = alt
+                    alt = alt.skip[0]
+                    tmp.skip = false
+                    continue
+                }
+                alt.skip = false
                 alt = alt.sibling
                 continue
             }
@@ -170,7 +176,7 @@ function reconcileChildren(parent, elements = [], parentTag) {
 
                         // Equal keys
                         if (alt.key === element.key) {
-                            fiber = alt.clone(parent, element.props, parentTag)
+                            fiber = alt.clone(parent, element.props)
                             relate()
                             continue
                         }
@@ -183,8 +189,9 @@ function reconcileChildren(parent, elements = [], parentTag) {
                         // Found an alternate with the same key as element
                         if (altWithSameKeyAsElement) {
 
-                            altWithSameKeyAsElement.tag = TAG_SKIP
+                            altWithSameKeyAsElement.skip = true
                             fiber = altWithSameKeyAsElement.clone(parent, element.props, TAG_INSERT, alt)
+                            if (fiber === altWithSameKeyAsElement) altWithSameKeyAsElement.skip = [altWithSameKeyAsElement.sibling]
 
                             // Found an element with the same key as alternate
                             if (elementWithSameKeyAsAlt) {
@@ -242,8 +249,9 @@ function reconcileChildren(parent, elements = [], parentTag) {
 
                     // Found an alternate with the same key as element
                     if (altWithSameKeyAsElement) {
-                        altWithSameKeyAsElement.tag = TAG_SKIP
+                        altWithSameKeyAsElement.skip = true
                         fiber = altWithSameKeyAsElement.clone(parent, element.props, TAG_INSERT, alt)
+                        if (fiber === altWithSameKeyAsElement) altWithSameKeyAsElement.skip = [altWithSameKeyAsElement.sibling]
                         scheduleDeletion()
                         relate()
                         continue
@@ -260,7 +268,7 @@ function reconcileChildren(parent, elements = [], parentTag) {
 
                 // Same type
                 if (alt.type === element.type) {
-                    fiber = alt.clone(parent, element.props, parentTag)
+                    fiber = alt.clone(parent, element.props)
                     relate()
                     continue
                 }
