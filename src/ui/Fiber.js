@@ -8,7 +8,7 @@ export const TAG_SKIP   = 0
 export const TAG_INSERT = 1
 
 const textNode = isBrowser ? document.createTextNode('') : null
-const elements = { div: isBrowser ? document.createElement('div') : null, }
+const elements = { template: isBrowser ? document.createElement('template') : null, }
 
 export default class Fiber {
 
@@ -31,6 +31,7 @@ export default class Fiber {
     }
 
     clone(parent, nextProps, tag, replace) {
+        // TODO: if Inline, also this.reuse = true
         if ('memo' in this.props && nextProps) {
             const memo = this.props.memo
             if (memo === true || memo(this.props, nextProps)) {
@@ -115,9 +116,10 @@ export default class Fiber {
             return
         }
         if ('html' in this.props) {
-            const node = elements.div.cloneNode()
-            node.innerHTML = this.type
-            this.node = node.firstChild
+            const tpl = elements.template
+            tpl.innerHTML = this.type
+            this.node = tpl.content.firstChild
+            tpl.innerHTML = ''
         } else {
             const node = elements[this.type] ??= document.createElement(this.type)
             this.node = node.cloneNode()
