@@ -1,81 +1,91 @@
-import { Text } from './Element'
-import { queue, hydration } from "./renderer"
-import { isBrowser } from '../utils'
+import { Text, Inline } from './Element'
+import { hydration, queue } from "./renderer"
 
-export const isReserved = prop => (prop === 'children' || prop === 'html' || prop === 'memo')
-export const isEventListener = prop => (prop[0] === 'o' && prop[1] === 'n')
-export const TAG_SKIP   = 0
-export const TAG_INSERT = 1
+const nodes = {} // nodes pool
+export const isReserved = prop => prop === 'children' || prop === 'html'
+export const isEventListener = prop => prop[0] === 'o' && prop[1] === 'n'
 
-const textNode = isBrowser ? document.createTextNode('') : null
-const elements = { template: isBrowser ? document.createElement('template') : null, }
-
+/**
+ * Virtual DOM node
+ */
 export default class Fiber {
 
-    constructor(element, node, parent, tag, replace) {
-        this.type = element?.type
-        this.isComponent = (typeof this.type === 'function')
+    constructor(element = {}, node, parent, insert = false, replace) {
+        this.type = element.type
+        this.props = element.props
+        this.key = element.key
         this.node = node
-        this.props = element?.props
         this.parent = parent
         this.sibling = null
         this.child = null
-        this.key = element?.key
         this.alt = null
-        this.tag = tag
-        this.replace = replace
-        this.states = this.isComponent ? [] : null
-        this.effects = this.isComponent ? [] : null
+
+        // Reconciliation
+        this.insert = insert
+        this.replace = replace?.isComponent ? null : replace // TODO: replace components also
         this.reuse = false
-        this.skip = false
+        this.rel = null
+
+        // Component
+        if (typeof this.type === 'function') {
+            this.isComponent = true
+            this.states = []
+            this.effects = []
+        }
     }
 
-    clone(parent, nextProps, tag, replace) {
-        // TODO: if Inline, also this.reuse = true
-        if ('memo' in this.props && nextProps) {
-            const memo = this.props.memo
-            if (memo === true || memo(this.props, nextProps)) {
-                // TODO: revert these and other "reuse" changes. E.g. in renderer reset()
-                // TODO: figure out how hot to revert tag.skip = [,] in reconciler
-                this.parent = parent
-                this.tag = tag
-                this.replace = replace?.isComponent ? null : replace
-                this.reuse = true
-                return this
-            }
+    clone(parent, nextProps, insert = false, replace) {
+        // Reuse
+        const reuse = false
+        // TODO: HERE decide whether to reuse or not
+        // (!) Imporatnt: if !parent ---> don't reuse (because it's root)
+        // ...
+        if (reuse) {
+            this.reuse = reuse
+            queue.reuses.push(this)
+            return this
         }
+
+        // Fiber clone
         const fiber = new Fiber
         fiber.type = this.type
-        fiber.isComponent = this.isComponent
-        fiber.node = this.node
         fiber.props = nextProps ?? this.props
-        fiber.parent = parent ?? this.parent
         fiber.key = this.key
+        fiber.node = this.node
+        fiber.parent = parent ?? this.parent
         fiber.alt = this
-        fiber.tag = tag
-        fiber.replace = replace?.isComponent ? null : replace
-        fiber.states = this.states
-        fiber.effects = this.effects
+
+        // Reconciliation
+        fiber.insert = insert
+        fiber.replace = replace?.isComponent ? null : replace // TODO: replace components also
+
+        // Component
+        if (this.isComponent) {
+            fiber.isComponent = true
+            fiber.states = this.states
+            fiber.effects = this.effects
+        }
+
         return fiber
     }
 
     reset() {
+        this.props.children &&= null // free memory // TODO: check if this prop is needed for memo props comparison
         this.alt = null
-        this.tag = null
+        this.insert = false
         this.replace = null
-        this.props.children &&= null
         this.reuse = false
-        this.skip = false
+        this.rel = null
     }
 
     /**
      * Applies changes to the DOM and manages side effects.
      */
     update(nodeCursor) {
-        if (this.parent?.isComponent) this.tag = this.parent.tag
+        if (this.parent?.isComponent) this.insert = this.parent.insert
         if (this.isComponent) {
             for (const e of this.effects) {
-                e && e.fn && (e.sync ? queue.sync.push(e.fn) : queue.async.push(e.fn))
+                e?.fn && (e.sync ? queue.sync.push(e.fn) : queue.async.push(e.fn))
             }
             return
         }
@@ -92,7 +102,7 @@ export default class Fiber {
 
         this.updateNode()
 
-        if (this.tag === TAG_INSERT) {
+        if (this.insert) {
             const parentNode = this.getParentNode()
             const replace = this.replace
             if (replace) {
@@ -111,19 +121,19 @@ export default class Fiber {
      */
     createNode() {
         if (this.type === Text) {
-            this.node = textNode.cloneNode()
+            this.node = (nodes.text ??= document.createTextNode('')).cloneNode()
             this.node.nodeValue = this.props.value
             return
         }
-        if ('html' in this.props) {
-            const tpl = elements.template
-            tpl.innerHTML = this.type
+        if (this.type === Inline) {
+            const tpl = nodes.template ??= document.createElement('template')
+            tpl.innerHTML = this.props.html
             this.node = tpl.content.firstChild
             tpl.innerHTML = ''
-        } else {
-            const node = elements[this.type] ??= document.createElement(this.type)
-            this.node = node.cloneNode()
+            return
         }
+        const node = nodes[this.type] ??= document.createElement(this.type)
+        this.node = node.cloneNode()
     }
 
     /**
@@ -134,8 +144,7 @@ export default class Fiber {
         const nextProps = this.props
 
         if (this.type === Text) {
-            if (hydration) return
-            if (String(nextProps.value) !== node.nodeValue) {
+            if (!hydration && (String(nextProps.value) !== node.nodeValue)) {
                 node.nodeValue = nextProps.value
             }
             return
@@ -185,7 +194,7 @@ export default class Fiber {
             }
 
             // Skip same values
-            if ((prop in prevProps) && prevProps[prop] === value) {
+            if (prop in prevProps && Object.is(value, prevProps[prop])) {
                 continue
             }
 
@@ -208,29 +217,43 @@ export default class Fiber {
      * Removes Fiber's node(s) from the DOM and unmounts Components.
      */
     unmount() {
+        const childFirst = (fiber) => {
+            if (!fiber.isComponent) return
+            for (const e of fiber.effects) {
+                e?.cleanup && (e.sync ? e.cleanup() : queue.async.push(e.cleanup))
+            }
+            fiber.effects.length = 0
+        }
+
         if (!this.isComponent) {
+            this.walkDepth(childFirst)
             this.node.parentNode.removeChild(this.node)
             return
         }
-        this.walkDepth(fiber => {
-            if (!fiber.isComponent) return
-            for (const e of fiber.effects) e && e.cleanup && e.cleanup()
-            fiber.effects = null
-        })
-        const childNodes = this.getChildNodes()
-        for (const node of childNodes) node.parentNode.removeChild(node)
+
+        const parentNode = this.getParentNode()
+        const parentFirst = (fiber) => {
+            if (fiber.isComponent) return
+            const node = fiber.node
+            parentNode === node.parentNode && parentNode.removeChild(node)
+        }
+
+        this.walkDepth(childFirst, parentFirst)
     }
 
     /**
      * Walks the subtree and applies the callback(s) to each fiber.
      */
     walkDepth(childFirst, parentFirst) {
+        // TODO: skip reused:
+        // ... if .insert === true, don't skip fibers of closest child nodes
+        // ... but skip their subtrees anyway
         let fiber = this
         let goDeep = true
+
+        // Node cursor
         let nodeCursor = hydration ? this.node : null
         const nodeStack = []
-        let reusing = false
-
         const beforeChild = hydration
             ? () => nodeCursor = nodeCursor.firstChild ?? nodeCursor
             : () => nodeStack.push(nodeCursor) && (nodeCursor = null)
@@ -251,24 +274,19 @@ export default class Fiber {
                 if (!fiber.parent.isComponent) nodeCursor = nodeStack.pop()
             }
 
+        // Walk
         while (true) {
             if (goDeep) {
-                // TODO: skip subtree of reusable fiber with tag insert (except fibers of getChildNodes())
-                if (fiber.reuse && fiber.tag == null) reusing = true
-                parentFirst && !reusing && parentFirst(fiber)
+                parentFirst && parentFirst(fiber)
                 if (fiber.child) {
                     if (!fiber.isComponent) beforeChild()
                     fiber = fiber.child
                     continue
                 }
             }
-            if (!reusing) childFirst(fiber, nodeCursor)
+            childFirst && childFirst(fiber, nodeCursor)
             while (true) {
                 if (fiber === this) return
-                if (fiber.reuse) {
-                    reusing = false
-                    fiber.reset()
-                }
                 if (fiber.sibling) {
                     if (!fiber.isComponent) beforeSibling()
                     fiber = fiber.sibling
@@ -290,34 +308,5 @@ export default class Fiber {
         let fiber = this
         while (!fiber.parent.node) fiber = fiber.parent
         return fiber.parent.node
-    }
-
-    /**
-     * Returns the closest child nodes.
-     */
-    getChildNodes() {
-        const nodes = []
-        if (!this.child) return nodes
-        let fiber = this.child
-        while (true) {
-            if (!fiber.isComponent) {
-                nodes.push(fiber.node)
-            } else if (fiber.child) {
-                fiber = fiber.child
-                continue
-            }
-            if (fiber.sibling) {
-                fiber = fiber.sibling
-                continue
-            }
-            while (true) {
-                fiber = fiber.parent
-                if (fiber === this) return nodes
-                if (fiber.sibling) {
-                    fiber = fiber.sibling
-                    break
-                }
-            }
-        }
     }
 }

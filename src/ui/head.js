@@ -1,4 +1,4 @@
-import { queue, hydration } from './renderer'
+import { hydration, queue } from './renderer'
 import { isBrowser } from '../utils'
 
 const headNode = isBrowser ? document.head : null

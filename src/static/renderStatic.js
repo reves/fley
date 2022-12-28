@@ -50,22 +50,23 @@ export default function renderStatic(children) {
 function rootToString(root) {
     let result = ''
     root.walkDepth((fiber) => {
-        if (fiber.isComponent || fiber === root) return
-        if (fiber.type === Text) {
-            result += escape(fiber.props.value)
-            return
+            if (fiber.isComponent || fiber === root) return
+            if (fiber.type === Text) {
+                result += escape(fiber.props.value)
+                return
+            }
+            if (fiber.props.hasOwnProperty('html')) {
+                result += fiber.type.replace(/^(<\w+)/, `$1${propsToString(fiber)}`)
+                return
+            }
+            if (voidElements.indexOf(fiber.type) !== -1) return
+            result += `</${fiber.type}>`
+        }, (fiber) => {
+            if (fiber.isComponent || fiber === root) return
+            if (fiber.type === Text || fiber.props.hasOwnProperty('html')) return
+            result += `<${fiber.type}${propsToString(fiber)}>`
         }
-        if (fiber.props.hasOwnProperty('html')) {
-            result += fiber.type.replace(/^(<\w+)/, `$1${propsToString(fiber)}`)
-            return
-        }
-        if (voidElements.indexOf(fiber.type) !== -1) return
-        result += `</${fiber.type}>`
-    }, (fiber) => {
-        if (fiber.isComponent || fiber === root) return
-        if (fiber.type === Text || fiber.props.hasOwnProperty('html')) return
-        result += `<${fiber.type}${propsToString(fiber)}>`
-    })
+    )
     return result
 }
 

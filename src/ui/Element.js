@@ -2,8 +2,8 @@
  * JSX Element types
  */
 export const Fragment = 0
-export const Inline = 1
-export const Text = 2
+export const Text = 1
+export const Inline = 2
 
 /**
  * JSX Element
@@ -12,7 +12,7 @@ export default function Element(type, props, key) {
     if ('children' in props) props.children = normalize(props.children)
     this.type = type
     this.props = props
-    this.key = key?.toString()
+    this.key = key
 }
 
 /**
@@ -20,13 +20,14 @@ export default function Element(type, props, key) {
  */
 export function normalize(children = [], result = [], keys = {}) {
 
-    children = Array.isArray(children) ? children : [children]
+    // Convert to array if not
+    if (!Array.isArray(children)) children = [children]
 
     // Process children
     for (let i=0, n=children.length; i<n; i++) {
 
         const child = children[i]
-        
+
         // Remove empty strings and unnecessary data types
         if (child === '' || child == null || child === false || child === true) {
             continue
@@ -63,11 +64,10 @@ export function normalize(children = [], result = [], keys = {}) {
                 result.push(new Element(Text, { value: html.split('<', 1)[0] }))
                 continue
             }
-            child.type = html
-            child.props.html = null
+            child.props.html = html
         }
 
-        // Filter Elements that have duplicate keys
+        // Filter duplicate keys
         if (child.key != null) {
             if (child.key in keys) continue
             keys[child.key] = null

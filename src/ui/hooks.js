@@ -1,37 +1,40 @@
 import { current, update, queue } from './renderer'
 import { getMethods } from '../utils'
 
+// Current hook index of the current Fiber.
 let cursor = 0
 export const resetCursor = _ => cursor = 0
+
+// Checks if arrays are the same.
 const same = (prev, next) => prev
     && prev.length === next.length
-    && prev.every((p, i) => Object.is(p, next[i]))
+    && prev.every((p, i) => p === next[i])
+
+const getStates = () => [current.states, cursor++]
 
 /**
- * States
+ * State
  */
 export const useState = initial => useReducer(false, initial)
 
 export function useReducer(reducer, initialState) {
-    const i = cursor++
+    const [states, i] = getStates()
     const fiber = current
-    const states = fiber.states
     const state = i in states ? states[i] : (states[i] = initialState)
     return [ state, reducer
             ? (action) => {
                 states[i] = reducer(state, action)
-                update(fiber)
+                if (states[i] !== state) update(fiber)
             }
             : (data) => {
                 states[i] = (typeof data === 'function') ? data(state) : data
-                update(fiber)
+                if (states[i] !== state) update(fiber)
             }
     ]
 }
 
 export function useRef(initial = null) {
-    const i = cursor++
-    const states = current.states
+    const [states, i] = getStates()
     if (i in states) return states[i]
     const ref = function(value) {
         if (arguments.length) ref.current = value
@@ -42,8 +45,7 @@ export function useRef(initial = null) {
 }
 
 export function useMemo(fn, deps) {
-    const i = cursor++
-    const states = current.states
+    const [states, i] = getStates()
     const memo = states[i] ??= []
     if (same(memo[1], deps)) return memo[0]
     memo[1] = deps
@@ -53,7 +55,7 @@ export function useMemo(fn, deps) {
 export const useCallback = (fn, deps) => useMemo(() => fn, deps)
 
 /**
- * Effects
+ * Effect
  */
 function Effect(sync = false) {
     this.sync = sync
@@ -90,7 +92,7 @@ function _useEffect(fn, deps, sync) {
 }
 
 /**
- * Stores
+ * Store
  */
 export function createStore(StoreClass, ...args) {
     if (!StoreClass.__ley) {
