@@ -92,9 +92,10 @@ function reset() {
 
     // Queue
     for (const fn of queue.reset) fn()
-    for (const fiber of queue.reuses) {
+    for (const [fiber, parent] of queue.reuses) {
         if (fiber.rel) {
             fiber.sibling = fiber.rel
+            fiber.parent = parent
             fiber.rel = null
         }
         fiber.reuse = false
@@ -132,7 +133,7 @@ function reconcile(fiber) {
     if (!fiber.reuse) {
         if (fiber.isComponent) {
             resetCursor()
-            reconcileChildren(fiber, normalize(type(fiber.props)))
+            reconcileChildren(fiber, normalize(type(fiber.props)), fiber.insert)
         } else {
             if (!fiber.node && isBrowser && !hydration) fiber.createNode()
             if (type !== Text && type !== Inline) {
@@ -153,7 +154,7 @@ function reconcile(fiber) {
  * Compares the existing child fibers to the new JSX elements and decides which 
  * changes to apply.
  */
-function reconcileChildren(parent, elements = []) {
+function reconcileChildren(parent, elements = [], parentInsert = false) {
     const elementsLen = elements.length
     let i = 0
     let alt = parent.alt?.child
@@ -185,11 +186,11 @@ function reconcileChildren(parent, elements = []) {
 
             // Looked-ahead alternate
             if (alt.rel) {
-                if (alt.rel === true) {
-                    alt = alt.sibling
+                if (alt.rel === true) { // just skip
                     alt.rel = null
+                    alt = alt.sibling
                 } else {
-                    alt = alt.rel // the original alt.sibling
+                    alt = alt.rel // continue with the original sibling
                 }
                 continue
             }
@@ -204,7 +205,7 @@ function reconcileChildren(parent, elements = []) {
 
                         // Equal keys
                         if (alt.key === element.key) {
-                            fiber = alt.clone(parent, element.props)
+                            fiber = alt.clone(parent, element.props, parentInsert)
                             relate()
                             continue
                         }
@@ -235,7 +236,7 @@ function reconcileChildren(parent, elements = []) {
 
                         // Not found an alternate with the same key as element
 
-                        fiber = new Fiber(element, null, parent, true, alt)
+                        fiber = new Fiber(element, null, parent, alt)
 
                         // Found an element with the same key as alternate
                         if (elementWithSameKeyAsAlt) {
@@ -256,14 +257,14 @@ function reconcileChildren(parent, elements = []) {
 
                     // Found an element with the same key as alternate
                     if (elementWithSameKeyAsAlt) {
-                        fiber = new Fiber(element, null, parent, true)
+                        fiber = new Fiber(element, null, parent)
                         elementWithSameKeyAsAlt.rel = alt
                         relate()
                         continue
                     }
 
                     // Not found an element with the same key as alternate
-                    fiber = new Fiber(element, null, parent, true, alt)
+                    fiber = new Fiber(element, null, parent, alt)
                     scheduleDeletion()
                     relate()
                     continue
@@ -284,7 +285,7 @@ function reconcileChildren(parent, elements = []) {
                     }
 
                     // Not found an alternate with the same key as element
-                    fiber = new Fiber(element, null, parent, true, alt)
+                    fiber = new Fiber(element, null, parent, alt)
                     scheduleDeletion()
                     relate()
                     continue
@@ -294,13 +295,13 @@ function reconcileChildren(parent, elements = []) {
 
                 // Same type
                 if (alt.type === element.type) {
-                    fiber = alt.clone(parent, element.props)
+                    fiber = alt.clone(parent, element.props, parentInsert)
                     relate()
                     continue
                 }
 
                 // Different type
-                fiber = new Fiber(element, null, parent, true, alt)
+                fiber = new Fiber(element, null, parent, alt)
                 scheduleDeletion()
                 relate()
                 continue
@@ -314,7 +315,7 @@ function reconcileChildren(parent, elements = []) {
 
         // Element exists but alternate does not
         if (element) {
-            fiber = new Fiber(element, null, parent, true)
+            fiber = new Fiber(element, null, parent)
             relate()
             continue
         }
@@ -374,6 +375,7 @@ function commit() {
 
     // Update DOM
     root.walkDepth((fiber, nodeCursor) => {
+        if (fiber.type === null) return
         fiber.update(nodeCursor)
         fiber.reset()
     })
