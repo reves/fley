@@ -34,7 +34,7 @@ export default class Fiber {
         }
     }
 
-    clone(parent, nextProps, insert = false, toReplace) {
+    clone(parent, nextProps, insert = false, toReplace) { // TOOD: insert <-- toReplace (store in insert ?)
 
         // Reuse (if not root)
         let reuse = false
@@ -42,13 +42,15 @@ export default class Fiber {
             // TODO: HERE decide whether to reuse or not
 
             if (this.type === Text && this.props.value === nextProps.value) reuse = true
-            else if (this.props.memo) reuse = true // actually should check `nextProps` also
-            
+            else if (this.props.memo && nextProps.memo) reuse = true
+
         }
 
         if (this.reuse = reuse) {
             queue.reuses.push([this, this.parent])
             this.parent = parent
+            this.insert = insert
+            this.toReplace = toReplace?.isComponent ? null : toReplace
             return this
         }
 
@@ -109,6 +111,7 @@ export default class Fiber {
      */
     update(nodeCursor) {
         // console.log('UPDATE: ', this.isComponent ? this.type.name : this.type, this.props.value || '', nodeCursor) // DEBUG
+        console.log('UPDATE: ', this.isComponent ? this.type.name : this.type, this.node || '') // DEBUG
 
         // Schedule effects
         if (this.isComponent) {

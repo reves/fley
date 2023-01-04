@@ -93,12 +93,9 @@ function reset() {
     // Queue
     for (const fn of queue.reset) fn()
     for (const [fiber, parent] of queue.reuses) {
-        if (fiber.rel) {
-            fiber.sibling = fiber.rel
-            fiber.parent = parent
-            fiber.rel = null
-        }
-        fiber.reuse = false
+        if (fiber.rel) fiber.sibling = fiber.rel
+        fiber.parent = parent
+        fiber.reset()
     }
     queue.deletions.length = 0
     queue.reuses.length = 0
@@ -168,8 +165,8 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
         prev.sibling = null
         i++
     }
-    const scheduleDeletion = (obsolete = false) => 
-        (obsolete || alt.isComponent || fiber.isComponent) && queue.deletions.push(alt)
+    const scheduleDeletion = () => // deletes alt if either alt or fiber is Component
+        (alt.isComponent || fiber.isComponent) && queue.deletions.push(alt)
 
     while (true) {
         const element = elements[i]
@@ -342,6 +339,7 @@ function getElementByKey(elements, elementsLen, startIndex, key) {
  */
 function commit() {
     if (!isBrowser) return [root, reset]
+    queue.reuses.length = 0
 
     // Force sync execution of remaining async effects from previous commit
     const async = queue.async
