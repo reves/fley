@@ -92,9 +92,9 @@ function reset() {
 
     // Queue
     for (const fn of queue.reset) fn()
-    for (const [fiber, parent] of queue.reuses) {
-        if (fiber.rel) fiber.sibling = fiber.rel
+    for (const [fiber, parent, sibling] of queue.reuses) {
         fiber.parent = parent
+        fiber.sibling = sibling
         fiber.reset()
     }
     queue.deletions.length = 0
@@ -165,8 +165,8 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
         prev.sibling = null
         i++
     }
-    const scheduleDeletion = () => // deletes alt if either alt or fiber is Component
-        (alt.isComponent || fiber.isComponent) && queue.deletions.push(alt)
+    const scheduleDeletion = (obsolete) => // delete if not suitable for node replacement
+        (obsolete || alt.isComponent || fiber.isComponent) && queue.deletions.push(alt)
 
     while (true) {
         const element = elements[i]
@@ -183,12 +183,11 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
 
             // Looked-ahead alternate
             if (alt.rel) {
-                if (alt.rel === true) { // just skip
-                    alt.rel = null
-                    alt = alt.sibling
-                } else {
-                    alt = alt.rel // continue with the original sibling
-                }
+                const nextAlt = alt.rel === true
+                    ? alt.sibling   // bool:  continue with the sibling
+                    : alt.rel       // Fiber: continue with the original sibling
+                alt.rel = null
+                alt = nextAlt
                 continue
             }
 
@@ -216,6 +215,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
                         if (altWithSameKeyAsElement) {
 
                             fiber = altWithSameKeyAsElement.clone(parent, element.props, true, alt)
+                            // remember the original sibling if reusing
                             altWithSameKeyAsElement.rel = fiber.reuse ? fiber.sibling : true
 
                             // Found an element with the same key as alternate
@@ -305,7 +305,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
             }
 
             // Alternate exists but element does not
-            queue.deletions.push(alt)
+            scheduleDeletion(true)
             alt = alt.sibling
             continue
         }
@@ -372,9 +372,9 @@ function commit() {
     for (const fiber of queue.deletions) fiber.unmount()
 
     // Update DOM
-    root.walkDepth((fiber, nodeCursor) => {
+    root.walkDepth((fiber, nodeCursor, setNodeCursor) => {
         if (fiber.type === null) return
-        fiber.update(nodeCursor)
+        fiber.update(nodeCursor, setNodeCursor)
         fiber.reset()
     })
 
@@ -401,10 +401,9 @@ function commit() {
 }
 
 function scheduleNextEffect() {
-    const async = queue.async
-    if (!async.length) return
-    queue.timeoutId = setTimeout(() => {
-        async.shift()()
-        scheduleNextEffect()
-    })
+    queue.timeoutId = queue.async.length
+        ? setTimeout(() => {
+            queue.async.shift()()
+            scheduleNextEffect()
+        }) : null
 }
