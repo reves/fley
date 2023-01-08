@@ -10,10 +10,10 @@ export const isEventListener = prop => prop[0] === 'o' && prop[1] === 'n'
  */
 export default class Fiber {
 
-    constructor(element = {}, node, parent, toReplace) {
-        this.type = element.type
-        this.props = element.props
-        this.key = element.key
+    constructor(elementOrFiber, node, parent, toReplace) {
+        this.type = elementOrFiber.type
+        this.props = elementOrFiber.props
+        this.key = elementOrFiber.key
         this.node = node
         this.parent = parent
         this.sibling = null
@@ -31,21 +31,21 @@ export default class Fiber {
             this.isComponent = true
             this.states = []
             this.effects = []
+            this.actual = [ this ] // ref to the latest version
         }
     }
 
-    clone(parent, nextProps, insert = false, toReplace) {
+    clone(parent, element, insert = false, toReplace) {
+        const nextProps = element?.props
 
         // Reuse
         let reuse = false
-        if (parent) { // not root
+        if (parent) {
             // TODO: HERE decide whether to reuse or not
 
             if (this.type === Text && this.props.value === nextProps.value) reuse = true
             else if (this.props.memo && nextProps.memo) reuse = true
-
         }
-
         if (this.reuse = reuse) {
             queue.reuses.push([this, this.parent, this.sibling])
             this.parent = parent
@@ -55,12 +55,7 @@ export default class Fiber {
         }
 
         // Fiber clone
-        const fiber = new Fiber
-        fiber.type = this.type
-        fiber.props = nextProps ?? this.props
-        fiber.key = this.key
-        fiber.node = this.node
-        fiber.parent = parent ?? this.parent
+        const fiber = new Fiber(element ?? this, this.node, parent ?? this.parent)
         fiber.alt = this
 
         // Reconciliation
@@ -72,6 +67,7 @@ export default class Fiber {
             fiber.isComponent = true
             fiber.states = this.states
             fiber.effects = this.effects
+            fiber.actual = this.actual
         }
 
         return fiber
@@ -124,6 +120,7 @@ export default class Fiber {
                 ? queue.sync.push(e.fn)
                 : queue.async.push(e.fn)
             )
+            this.actual[0] = this // Update ref
             return
         }
 
@@ -263,7 +260,9 @@ export default class Fiber {
             ? e.cleanup()
             : queue.async.push(e.cleanup)
         )
-        this.effects.length = 0
+        this.effects = null
+        this.states = null
+        this.actual = null
     }
 
     /**

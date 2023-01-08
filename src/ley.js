@@ -4,7 +4,7 @@ import { update, setSyncOnly } from './ui/renderer'
 
 export default function ley(children, container = document.body) {
     container.innerHTML = ''
-    update(new Fiber( new Element(null, { children }), container ))
+    update(new Fiber( new Element(null, { children }), container))
 }
 
 export function leySync() {

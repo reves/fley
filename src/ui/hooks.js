@@ -10,41 +10,45 @@ const same = (prev, next) => prev
     && prev.length === next.length
     && prev.every((p, i) => p === next[i])
 
-const getStates = () => [current.states, cursor++]
-
 /**
  * State
  */
-export const useState = initial => useReducer(false, initial)
+const getStates = _ => [current.states, cursor++]
 
-export function useReducer(reducer, initialState) {
+export const useState = (initialValue) => useReducer(false, initialValue)
+
+export const useReducer = (reducer, initialValue, init) => {
     const [states, i] = getStates()
-    const fiber = current
-    const state = i in states ? states[i] : (states[i] = initialState)
-    return [ state, reducer
-            ? (action) => {
-                states[i] = reducer(state, action)
-                if (states[i] !== state) update(fiber)
-            }
-            : (data) => {
-                states[i] = (typeof data === 'function') ? data(state) : data
-                if (states[i] !== state) update(fiber)
-            }
+    if (i in states) return states[i]
+    const actual = current.actual
+    const getNextValue = reducer
+        ? (prev, data) => reducer(prev, data) // data means "action"
+        : (prev, data) => ((typeof data === 'function') ? data(prev) : data)
+    const state = [
+        init ? init(initialValue) : initialValue,
+        (data) => {
+            const prev = state[0]
+            const next = getNextValue(prev, data)
+            if (prev === next && typeof prev !== 'object') return
+            state[0] = next
+            update(actual[0])
+        }
     ]
+    return states[i] = state
 }
 
-export function useRef(initial = null) {
+export const useRef = (initialValue) => {
     const [states, i] = getStates()
     if (i in states) return states[i]
     const ref = function(value) {
         if (arguments.length) ref.current = value
         return ref.current
     }
-    ref.current = initial
+    ref.current = initialValue
     return states[i] = ref
 }
 
-export function useMemo(fn, deps) {
+export const useMemo = (fn, deps) => {
     const [states, i] = getStates()
     const memo = states[i] ??= []
     if (same(memo[1], deps)) return memo[0]
@@ -94,10 +98,10 @@ function _useEffect(fn, deps, sync) {
 /**
  * Store
  */
-export function createStore(StoreClass, ...args) {
-    if (!StoreClass.__ley) {
-        // Wrap non-static methods (including extended ones)
-        StoreClass.__ley = true
+export const createStore = (StoreClass, ...args) => {
+    // Wrap non-static methods (including extended ones)
+    if (!StoreClass._ley) {
+        StoreClass._ley = true
         let depth = 0
         for (const method of getMethods(StoreClass)) {
             const action = StoreClass.prototype[method]
@@ -110,24 +114,28 @@ export function createStore(StoreClass, ...args) {
             }
         }
     }
+
     // Set up the store and watchers list
     const store = new StoreClass(...args)
+    const watchers = new Set
     store.action = (fn) => {
         fn && fn()
-        new Set(store.action.__watchers).forEach(([fiber, condition]) => condition
-            ? condition(store) && update(fiber)
-            : update(fiber)
-        )
+        new Set(watchers)
+            .forEach(([actual, condition]) => {
+                condition
+                    ? condition(store) && update(actual[0])
+                    : update(actual[0])
+            })
     }
-    store.action.__watchers = new Set
+    store.action._watchers = watchers
     return store
 }
 
-export function useStore(store, condition) {
-    const watchers = store.action.__watchers
-    const entry = [current, condition]
+export const useStore = (store, condition) => {
+    const watchers = store.action._watchers
+    const entry = [current.actual, condition]
     useLayoutEffect(() => {
         watchers.add(entry)
         return () => watchers.delete(entry)
-    })
+    }, condition ? null : [])
 }

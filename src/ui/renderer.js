@@ -39,7 +39,9 @@ export const queue = {
  * Initiates the rendering process of the fiber subtree.
  */
 export function update(fiber, hydrate = false) {
-    
+    // Unmounted
+    if (fiber.type && !fiber.actual) return
+
     // Another rendering process is already running
     if (root) {
         const rootAlt = root.alt
@@ -173,7 +175,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
 
         // Looked-ahead element
         if (element?.rel) {
-            fiber = element.rel.clone(parent, element.props, true)
+            fiber = element.rel.clone(parent, element, true)
             element.rel = null
             relate(true)
             continue
@@ -201,7 +203,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
 
                         // Equal keys
                         if (alt.key === element.key) {
-                            fiber = alt.clone(parent, element.props, parentInsert)
+                            fiber = alt.clone(parent, element, parentInsert)
                             relate()
                             continue
                         }
@@ -214,7 +216,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
                         // Found an alternate with the same key as element
                         if (altWithSameKeyAsElement) {
 
-                            fiber = altWithSameKeyAsElement.clone(parent, element.props, true, alt)
+                            fiber = altWithSameKeyAsElement.clone(parent, element, true, alt)
                             // remember the original sibling if reusing
                             altWithSameKeyAsElement.rel = fiber.reuse ? fiber.sibling : true
 
@@ -274,7 +276,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
 
                     // Found an alternate with the same key as element
                     if (altWithSameKeyAsElement) {
-                        fiber = altWithSameKeyAsElement.clone(parent, element.props, true, alt)
+                        fiber = altWithSameKeyAsElement.clone(parent, element, true, alt)
                         altWithSameKeyAsElement.rel = fiber.reuse ? fiber.sibling : true
                         scheduleDeletion()
                         relate()
@@ -292,7 +294,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
 
                 // Same type
                 if (alt.type === element.type) {
-                    fiber = alt.clone(parent, element.props, parentInsert)
+                    fiber = alt.clone(parent, element, parentInsert)
                     relate()
                     continue
                 }
