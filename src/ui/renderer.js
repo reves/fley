@@ -27,8 +27,8 @@ export let current = null
 let idleCallbackId = null
 export const queue = {
     deletions:  [], // fibers to be unmounted
-    reuses:     [], // fibers to be reused
     update:     [], // fibers to be updated
+    cancel:     [], // functions to be called on cancel
     reset:      [], // functions to be called in reset()
     sync:       [], // effects to be performed sync. during commit
     async:      [], // effects to be performed async. after commit
@@ -94,13 +94,9 @@ function reset() {
 
     // Queue
     for (const fn of queue.reset) fn()
-    for (const [fiber, parent, sibling] of queue.reuses) {
-        fiber.parent = parent
-        fiber.sibling = sibling
-        fiber.reset()
-    }
+    for (const fn of queue.cancel) fn()
     queue.deletions.length = 0
-    queue.reuses.length = 0
+    queue.cancel.length = 0
     queue.update.length = 0
     queue.reset.length = 0
     queue.sync.length = 0
@@ -341,7 +337,7 @@ function getElementByKey(elements, elementsLen, startIndex, key) {
  */
 function commit() {
     if (!isBrowser) return [root, reset]
-    queue.reuses.length = 0
+    queue.cancel.length = 0
 
     // Force sync execution of remaining async effects from previous commit
     const async = queue.async

@@ -116,7 +116,7 @@ function Component() {
 
 ### useReducer
 ```javascript
-const [state, dispatch] = useReducer(reducer, initialState)
+const [state, dispatch] = useReducer(reducer, initialState, init)
 ```
 ```javascript
 const reducer = (state, action) => {
@@ -200,11 +200,13 @@ function Component() {
     return <div>The current route is {router.name}</div>
 }
 ```
-If the condition is set, the component will be updated only if the condition returns true.
+If a _condition_ function is set, the component will be updated only when the _condition_ returns _true_ (this function is registered only once, on mount, so make sure to use the latest version of props received as argument).
 ```javascript
 function Item({ id }) {
-    useStore(selector, () => selector.id === id || selector.lastId === id)
-    // useStore(selector, (store) => store.id === id || store.lastId === id)
+    useStore(selector, (props) => 
+        selector.id === props.id || selector.lastId === props.id
+        // wrong: selector.id === id || selector.lastId === id
+    )
 
     return <div class={selector.id === id ? 'selected' : ''}>
         <a onClick={selector.select(id)}>Item</a>
@@ -744,10 +746,11 @@ handler.abort()
 2. On the server, match the route and serve corresponding static HTML
 4. Hydrate on the client side
 
-A template engine can be used on the server side to include the data. This can be achieved by first setting the initial state values to template variables in the application:
+<!--A template engine can be used on the server side to include the data. This can be achieved by first setting the initial state values to template variables in the application:
 ```javascript
 const [title, setTitle] = useState('{{article.title}}')
-```
+```-->
+
 ### Guide
 #### 1. Replace `ley()` with `hydrate()` in `index.jsx`
 ```javascript

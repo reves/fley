@@ -36,22 +36,41 @@ export default class Fiber {
     }
 
     clone(parent, element, insert = false, toReplace) {
-        const nextProps = element?.props
-
-        // Reuse
-        let reuse = false
+        // Reuse check
         if (parent) {
-            // TODO: HERE decide whether to reuse or not
+            const prevProps = this.props
+            const nextProps = element.props
+            let reuse = false
 
-            if (this.type === Text && this.props.value === nextProps.value) reuse = true
-            else if (this.props.memo && nextProps.memo) reuse = true
-        }
-        if (this.reuse = reuse) {
-            queue.reuses.push([this, this.parent, this.sibling])
-            this.parent = parent
-            this.insert = insert
-            this.toReplace = toReplace
-            return this
+            switch (this.type) {
+                case Text: // reuse (true), or reuse and update text (1)
+                    reuse = (prevProps.value === nextProps.value) ? true : 1
+                    break
+                case Inline:
+                    if (prevProps.html !== nextProps.html) 
+                        return new Fiber(element, null, parent, this)
+                    if (!prevProps.length && !nextProps.length) {
+                        reuse = true
+                        break
+                    }
+                default:
+                    if (prevProps.memo && nextProps.memo) reuse = true
+            }
+
+            if (this.reuse = reuse) {
+                const _parent = this.parent, _sibling = this.sibling, _props = prevProps
+                queue.cancel.push(() => {
+                    this.parent = _parent
+                    this.sibling = _sibling
+                    this.props = _props
+                    this.reset()
+                })
+                this.parent = parent
+                this.insert = insert
+                this.toReplace = toReplace
+                this.props = nextProps
+                return this
+            }
         }
 
         // Fiber clone
@@ -74,7 +93,7 @@ export default class Fiber {
     }
 
     reset() {
-        this.props.children &&= null // free memory // TODO: check if this prop is needed for memo props comparison
+        this.props.children &&= null // free memory
         this.alt = null
         this.insert = false
         this.toReplace = null
@@ -105,12 +124,18 @@ export default class Fiber {
      * Applies changes to the DOM and schedules side effects.
      */
     update(nodeCursor, setNodeCursor) {
-        // Reuse
-        if (this.reuse) {
+        // Reusing
+        const reuse = this.reuse
+        if (reuse) {
             if (this.isComponent) {
                 const onEach = this.insert && (f => f.insertNode(nodeCursor))
                 setNodeCursor(this.getLastNode(onEach))
-            } else if (this.insert) this.insertNode(nodeCursor)
+                return
+            }
+            if (this.insert) this.insertNode(nodeCursor)
+            if (this.type === Text && reuse === 1) {
+                this.node.nodeValue = this.props.value
+            }
             return
         }
 
@@ -139,12 +164,6 @@ export default class Fiber {
         // Insert or move the node, or replace another node
         if (this.insert) this.insertNode(nodeCursor)
 
-        // Update Text value
-        if (this.type === Text) {
-            this.node.nodeValue = this.props.value
-            return
-        }
-
         // Update attributes
         this.updateNode()
     }
@@ -154,12 +173,20 @@ export default class Fiber {
      */
     insertNode(nodeCursor) {
         const parentNode = this.getParentNode()
+
+        if (this.alt && this.type === Inline) {
+            console.log(this.alt)
+            parentNode.replaceChild(this.node, this.alt.node)
+            return
+        }
+
         const toReplace = this.toReplace
         if (toReplace && !toReplace.isComponent) {
             toReplace.unmount(false)
             parentNode.replaceChild(this.node, toReplace.node)
             return
         }
+
         const relNode = nodeCursor
             ? nodeCursor.nextSibling
             : parentNode.firstChild

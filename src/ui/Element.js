@@ -58,7 +58,7 @@ export function normalize(children = [], result = [], keys = {}) {
 
         // Inline HTML
         if (child.type === Inline) {
-            const html = child.props.html.trim()
+            const html = (child.props.html + '').trim()
             if (!html) continue
             if (html[0] !== '<') {
                 result.push(new Element(Text, { value: html.split('<', 1)[0] }))

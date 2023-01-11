@@ -20,9 +20,10 @@ export const useState = (initialValue) => useReducer(false, initialValue)
 export const useReducer = (reducer, initialValue, init) => {
     const [states, i] = getStates()
     if (i in states) return states[i]
+    if (typeof initialValue === 'function') initialValue = initialValue()
     const actual = current.actual
     const getNextValue = reducer
-        ? (prev, data) => reducer(prev, data) // data means "action"
+        ? (prev, data) => reducer(prev, data) // here data means action
         : (prev, data) => ((typeof data === 'function') ? data(prev) : data)
     const state = [
         init ? init(initialValue) : initialValue,
@@ -122,9 +123,10 @@ export const createStore = (StoreClass, ...args) => {
         fn && fn()
         new Set(watchers)
             .forEach(([actual, condition]) => {
+                const fiber = actual[0]
                 condition
-                    ? condition(store) && update(actual[0])
-                    : update(actual[0])
+                    ? condition(fiber.props) && update(fiber)
+                    : update(fiber)
             })
     }
     store.action._watchers = watchers
@@ -132,10 +134,11 @@ export const createStore = (StoreClass, ...args) => {
 }
 
 export const useStore = (store, condition) => {
-    const watchers = store.action._watchers
-    const entry = [current.actual, condition]
+    const actual = current.actual
     useLayoutEffect(() => {
+        const watchers = store.action._watchers
+        const entry = [actual, condition]
         watchers.add(entry)
         return () => watchers.delete(entry)
-    }, condition ? null : [])
+    }, [])
 }
