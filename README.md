@@ -54,24 +54,24 @@ function App() {
 
 ley(<App/>)
 ```
-#### Inline HTML, SVGs
+### Inline HTML
 
 ```javascript
 import ley, { Inline } from 'ley'
 import iconUser from './icon-user.svg' // e.g. import with Webpack as an asset/source
 
 // (!) SVG elements can only be used as Inline elements.
+
 // The created DOM node will be reused if the 'html' string
-// remains the same, or a unique 'key' is set.
+// remains the same.
 
 ley(<>
-    <Inline html={iconUser} width="16px" key="icon-user"/>
+    <Inline html={iconUser} width="16px"/>
     <Inline html="<ul> <li>One</li> <li>Two</li> </ul>" style="color: green;"/>
     <Inline html="Must start with an outer element. <p>This is omitted</p>"/>
-    <Inline html="Plain text" />
+    <Inline html="Plain text"/>
 </>)
 ```
-Result
 ```html
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="16px">
     <circle cx="50" cy="50" r="50"></circle>
@@ -82,6 +82,53 @@ Result
 </ul>
 Must start with an outer element.
 Plain text
+```
+### Memoization
+When the value of the `memo` prop evaluates to `true`, it means that the props (attributes) and contents of the Element/Component have not changed since the last render.
+
+```javascript
+function Item({ name }) {
+    console.log('Item')
+
+    return <div>{ name }</div>
+}
+
+function List() {
+    console.log('List')
+    
+    const [items, setItems] = useState(['A', 'B', 'C'])
+
+    useEffect(() => {
+        setItems(['CHANGED', 'B', 'C']) // change an item
+    }, [])
+
+    // (!) Always use the `key` prop if the memoized Element/Component
+    // can change its order among its siblings.
+    
+    return <>
+        <div memo> {/* same as memo={true} */}
+            This div is always reused. Also it never changes its position,
+            therefore, in this case, the "key" prop is not needed.
+        </div>
+        {items.map((item, i) =>
+            <Item
+                key={i}
+                name={item}
+                memo={(prev, next) => prev.name === next.name}
+            />
+        )}
+    </>
+}
+
+ley(<List/>)
+
+// Without "memo" (on state update):
+// (1) List
+// (3) Item
+
+// With "memo":
+// (1) List
+// (1) Item
 ```
 
 ## Hooks

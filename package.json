@@ -1,6 +1,6 @@
 {
     "name": "@reves/ley",
-    "version": "1.1.10",
+    "version": "1.2.0",
     "description": "Frontend JavaScript web framework based on JSX syntax and concurrent renderer with Fiber Architecture",
     "keywords": [
         "ley", "frontend", "framework", "ui-library", "jsx", "concurrency", "hooks", "router", "i18n", "reconciliation", "fiber", "global-store", "hydration", "ssr"

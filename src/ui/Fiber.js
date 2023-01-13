@@ -18,12 +18,12 @@ export default class Fiber {
         this.parent = parent
         this.sibling = null
         this.child = null
-        this.alt = null
 
         // Reconciliation
+        this.alt = null
         this.insert = true
         this.toReplace = toReplace
-        this.reuse = false
+        this.memo = false // skip update stage and subtree reconciliation
         this.rel = null
 
         // Component
@@ -31,55 +31,38 @@ export default class Fiber {
             this.isComponent = true
             this.states = []
             this.effects = []
-            this.actual = [ this ] // ref to the latest version
+            this.actual = [ this ] // ref to the latest cloned version
         }
     }
 
     clone(parent, element, insert = false, toReplace) {
-        // Reuse check
+        // Memoization check
+        let memoize = false
         if (parent) {
             const prevProps = this.props
             const nextProps = element.props
-            let reuse = false
-
             switch (this.type) {
-                case Text: // reuse (true), or reuse and update text (1)
-                    reuse = (prevProps.value === nextProps.value) ? true : 1
-                    break
+                case Text: break
                 case Inline:
                     if (prevProps.html !== nextProps.html) 
                         return new Fiber(element, null, parent, this)
-                    if (!prevProps.length && !nextProps.length) {
-                        reuse = true
-                        break
-                    }
                 default:
-                    if (prevProps.memo && nextProps.memo) reuse = true
-            }
-
-            if (this.reuse = reuse) {
-                const _parent = this.parent, _sibling = this.sibling, _props = prevProps
-                queue.cancel.push(() => {
-                    this.parent = _parent
-                    this.sibling = _sibling
-                    this.props = _props
-                    this.reset()
-                })
-                this.parent = parent
-                this.insert = insert
-                this.toReplace = toReplace
-                this.props = nextProps
-                return this
+                    const memo = nextProps.memo
+                    if (prevProps.memo && memo) {
+                        memoize = (typeof memo === 'function')
+                            ? memo(prevProps, nextProps)
+                            : true
+                    }
             }
         }
 
-        // Fiber clone
-        const fiber = new Fiber(element ?? this, this.node, parent ?? this.parent)
-        fiber.alt = this
+        // Create a clone
+        const fiber = new Fiber(element ?? this, this.node, parent ?? this.parent, toReplace)
 
         // Reconciliation
+        fiber.alt = this
         fiber.insert = insert
-        fiber.toReplace = toReplace
+        fiber.memo = memoize
 
         // Component
         if (this.isComponent) {
@@ -95,9 +78,9 @@ export default class Fiber {
     reset() {
         this.props.children &&= null // free memory
         this.alt = null
+        this.memo = false
         this.insert = false
         this.toReplace = null
-        this.reuse = false
     }
 
     /**
@@ -124,28 +107,30 @@ export default class Fiber {
      * Applies changes to the DOM and schedules side effects.
      */
     update(nodeCursor, setNodeCursor) {
-        // Reusing
-        const reuse = this.reuse
-        if (reuse) {
-            if (this.isComponent) {
-                const onEach = this.insert && (f => f.insertNode(nodeCursor))
-                setNodeCursor(this.getLastNode(onEach))
-                return
+        const memoized = this.memo
+
+        // Update relations
+        if (memoized) {
+            let child = (this.child = this.alt.child)
+            while (child) {
+                child.parent = this
+                child = child.sibling
             }
-            if (this.insert) this.insertNode(nodeCursor)
-            if (this.type === Text && reuse === 1) {
-                this.node.nodeValue = this.props.value
-            }
-            return
         }
 
-        // Schedule effects
         if (this.isComponent) {
-            for (const e of this.effects) e?.fn && (e.sync
-                ? queue.sync.push(e.fn)
-                : queue.async.push(e.fn)
-            )
-            this.actual[0] = this // Update ref
+            if (memoized) {
+                const onEach = this.insert && (f => f.insertNode(nodeCursor))
+                setNodeCursor(this.getLastNode(onEach))
+            } else {
+                // Schedule effects
+                for (const e of this.effects) e?.fn && (e.sync
+                    ? queue.sync.push(e.fn)
+                    : queue.async.push(e.fn)
+                )
+            }
+            // Update version
+            if (this.isComponent) this.actual[0] = this
             return
         }
 
@@ -165,7 +150,7 @@ export default class Fiber {
         if (this.insert) this.insertNode(nodeCursor)
 
         // Update attributes
-        this.updateNode()
+        if (!memoized) this.updateNode()
     }
 
     /**
@@ -173,20 +158,12 @@ export default class Fiber {
      */
     insertNode(nodeCursor) {
         const parentNode = this.getParentNode()
-
-        if (this.alt && this.type === Inline) {
-            console.log(this.alt)
-            parentNode.replaceChild(this.node, this.alt.node)
-            return
-        }
-
         const toReplace = this.toReplace
         if (toReplace && !toReplace.isComponent) {
             toReplace.unmount(false)
             parentNode.replaceChild(this.node, toReplace.node)
             return
         }
-
         const relNode = nodeCursor
             ? nodeCursor.nextSibling
             : parentNode.firstChild
@@ -200,6 +177,12 @@ export default class Fiber {
         const node = this.node
         const nextProps = this.props
         const prevProps = this.alt?.props ?? {}
+
+        if (this.type === Text) {
+            const value = nextProps.value
+            if (prevProps.value !== value) this.node.nodeValue = value
+            return
+        }
 
         // Obsolete props
         for (const prop in prevProps) {
@@ -266,30 +249,37 @@ export default class Fiber {
      * Removes Fiber's node(s) from the DOM and unmounts Components.
      */
     unmount(removeNode = true) {
-        if (!this.isComponent) {
-            this.walkDepth((fiber) => fiber.isComponent && fiber.cleanup())
-            removeNode && this.node.parentNode.removeChild(this.node)
+        if (this.isComponent) {
+            const parentNode = this.getParentNode()
+            const toRemove = [] // the Component's closest child nodes
+            this.walkDepth((fiber) => {
+                fiber.cleanup()
+                if (!fiber.isComponent) {
+                    const node = fiber.node
+                    node.parentNode === parentNode && toRemove.push(node)
+                }
+            })
+            for (const node of toRemove) parentNode.removeChild(node)
             return
         }
-        const parentNode = this.getParentNode()
-        this.walkDepth((fiber) => {
-            if (fiber.isComponent) return fiber.cleanup()
-            const node = fiber.node
-            node.parentNode === parentNode && parentNode.removeChild(node)
-        })
+        this.walkDepth((fiber) => fiber.cleanup())
+        removeNode && this.node.parentNode.removeChild(this.node)
     }
 
     /**
      * Calls (sync) or schedules (async) each effect's cleanup function.
      */
     cleanup() {
-        for (const e of this.effects) e?.cleanup && (e.sync
-            ? e.cleanup()
-            : queue.async.push(e.cleanup)
-        )
-        this.effects = null
-        this.states = null
-        this.actual = null
+        if (this.isComponent) {
+            for (const e of this.effects) e?.cleanup && (e.sync
+                ? e.cleanup()
+                : queue.async.push(e.cleanup)
+            )
+            this.states = null
+            this.effects = null
+            this.actual = null
+        } else if (this.props.ref) this.props.ref(null)
+        this.props = null
     }
 
     /**
@@ -327,8 +317,8 @@ export default class Fiber {
         while (true) {
             if (goDeep) {
                 // Perform parentFirst()
-                // and don't go deeper if returned `null`, or if reusing
-                if (parentFirst && parentFirst(fiber) === null || fiber.reuse) {
+                // and don't go deeper if returned `null` or memoized
+                if (parentFirst && parentFirst(fiber) === null || fiber.memo) {
                     goDeep = false
                     continue
                 }
@@ -376,7 +366,7 @@ export default class Fiber {
      */
     getLastNode(onEach) {
         let lastNode = null
-        this.reuse = false
+        this.memo = false
         this.walkDepth(null, (fiber) => {
             if (fiber !== this && !fiber.isComponent) {
                 onEach && onEach(fiber)

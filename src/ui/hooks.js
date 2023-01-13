@@ -1,5 +1,4 @@
 import { current, update, queue } from './renderer'
-import { getMethods } from '../utils'
 
 // Current hook index of the current Fiber.
 let cursor = 0
@@ -103,10 +102,21 @@ export const createStore = (StoreClass, ...args) => {
     // Wrap non-static methods (including extended ones)
     if (!StoreClass._ley) {
         StoreClass._ley = true
+        const prototype = StoreClass.prototype
+
+        // Get methods
+        let methods = []
+        let p = prototype
+        while (p.constructor !== Object) {
+            methods.push(...Object.getOwnPropertyNames(p))
+            p = Object.getPrototypeOf(p)
+        }
+
+        // Wrap methods
         let depth = 0
-        for (const method of getMethods(StoreClass)) {
-            const action = StoreClass.prototype[method]
-            StoreClass.prototype[method] = function() {
+        for (const method of methods.filter(m => m !== 'constructor')) {
+            const action = prototype[method]
+            prototype[method] = function() {
                 depth++
                 const result = action.apply(this, arguments)
                 depth--

@@ -28,7 +28,6 @@ let idleCallbackId = null
 export const queue = {
     deletions:  [], // fibers to be unmounted
     update:     [], // fibers to be updated
-    cancel:     [], // functions to be called on cancel
     reset:      [], // functions to be called in reset()
     sync:       [], // effects to be performed sync. during commit
     async:      [], // effects to be performed async. after commit
@@ -94,9 +93,7 @@ function reset() {
 
     // Queue
     for (const fn of queue.reset) fn()
-    for (const fn of queue.cancel) fn()
     queue.deletions.length = 0
-    queue.cancel.length = 0
     queue.update.length = 0
     queue.reset.length = 0
     queue.sync.length = 0
@@ -125,7 +122,7 @@ function render(deadline) {
 function reconcile(fiber) {
     const type = fiber.type
 
-    if (!fiber.reuse) {
+    if (!fiber.memo) {
         if (fiber.isComponent) {
             resetCursor()
             reconcileChildren(fiber, normalize(type(fiber.props)), fiber.insert)
@@ -137,7 +134,7 @@ function reconcile(fiber) {
         }
     }
 
-    if (fiber.child && !fiber.reuse) return fiber.child
+    if (fiber.child && !fiber.memo) return fiber.child
     while (fiber) {
         if (fiber.sibling) return fiber.sibling
         if (fiber.parent === root) return null
@@ -181,11 +178,8 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
 
             // Looked-ahead alternate
             if (alt.rel) {
-                const nextAlt = alt.rel === true
-                    ? alt.sibling   // bool:  continue with the sibling
-                    : alt.rel       // Fiber: continue with the original sibling
                 alt.rel = null
-                alt = nextAlt
+                alt = alt.sibling
                 continue
             }
 
@@ -213,8 +207,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
                         if (altWithSameKeyAsElement) {
 
                             fiber = altWithSameKeyAsElement.clone(parent, element, true, alt)
-                            // remember the original sibling if reusing
-                            altWithSameKeyAsElement.rel = fiber.reuse ? fiber.sibling : true
+                            altWithSameKeyAsElement.rel = true
 
                             // Found an element with the same key as alternate
                             if (elementWithSameKeyAsAlt) {
@@ -273,7 +266,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
                     // Found an alternate with the same key as element
                     if (altWithSameKeyAsElement) {
                         fiber = altWithSameKeyAsElement.clone(parent, element, true, alt)
-                        altWithSameKeyAsElement.rel = fiber.reuse ? fiber.sibling : true
+                        altWithSameKeyAsElement.rel = true
                         scheduleDeletion()
                         relate()
                         continue
@@ -337,7 +330,6 @@ function getElementByKey(elements, elementsLen, startIndex, key) {
  */
 function commit() {
     if (!isBrowser) return [root, reset]
-    queue.cancel.length = 0
 
     // Force sync execution of remaining async effects from previous commit
     const async = queue.async
@@ -347,7 +339,7 @@ function commit() {
         async.length = 0
     }
 
-    // Relace the alternate from the main tree with the updated fiber
+    // Replace the alternate in the tree with its clone
     if (root.parent) {
         const alt = root.alt
         const altParent = alt.parent
