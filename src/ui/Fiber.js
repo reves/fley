@@ -24,7 +24,7 @@ export default class Fiber {
         this.insert = true
         this.toReplace = toReplace
         this.memo = false // skip update stage and subtree reconciliation
-        this.rel = null
+        this.skip = false
 
         // Component
         if (typeof this.type === 'function') {
@@ -160,7 +160,6 @@ export default class Fiber {
         const parentNode = this.getParentNode()
         const toReplace = this.toReplace
         if (toReplace && !toReplace.isComponent) {
-            toReplace.unmount(false)
             parentNode.replaceChild(this.node, toReplace.node)
             return
         }

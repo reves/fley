@@ -160,8 +160,8 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
         prev.sibling = null
         i++
     }
-    const scheduleDeletion = (obsolete) => // delete if not suitable for node replacement
-        (obsolete || alt.isComponent || fiber.isComponent) && queue.deletions.push(alt)
+    const scheduleDeletion = (removeNode = false) =>
+        queue.deletions.push([alt, removeNode])
 
     while (true) {
         const element = elements[i]
@@ -177,8 +177,8 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
         if (alt) {
 
             // Looked-ahead alternate
-            if (alt.rel) {
-                alt.rel = null
+            if (alt.skip) {
+                alt.skip = false
                 alt = alt.sibling
                 continue
             }
@@ -207,7 +207,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
                         if (altWithSameKeyAsElement) {
 
                             fiber = altWithSameKeyAsElement.clone(parent, element, true, alt)
-                            altWithSameKeyAsElement.rel = true
+                            altWithSameKeyAsElement.skip = true
 
                             // Found an element with the same key as alternate
                             if (elementWithSameKeyAsAlt) {
@@ -242,17 +242,16 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
                     // Keyed alternate and non-keyed element
 
                     const elementWithSameKeyAsAlt = getElementByKey(elements, elementsLen, i+1, alt.key)
+                    fiber = new Fiber(element, null, parent, alt)
 
                     // Found an element with the same key as alternate
                     if (elementWithSameKeyAsAlt) {
-                        fiber = new Fiber(element, null, parent)
                         elementWithSameKeyAsAlt.rel = alt
                         relate()
                         continue
                     }
 
                     // Not found an element with the same key as alternate
-                    fiber = new Fiber(element, null, parent, alt)
                     scheduleDeletion()
                     relate()
                     continue
@@ -262,19 +261,18 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
                 if (element.key != null) {
 
                     const altWithSameKeyAsElement = getSiblingByKey(alt, element.key)
+                    scheduleDeletion()
 
                     // Found an alternate with the same key as element
                     if (altWithSameKeyAsElement) {
                         fiber = altWithSameKeyAsElement.clone(parent, element, true, alt)
-                        altWithSameKeyAsElement.rel = true
-                        scheduleDeletion()
+                        altWithSameKeyAsElement.skip = true
                         relate()
                         continue
                     }
 
                     // Not found an alternate with the same key as element
                     fiber = new Fiber(element, null, parent, alt)
-                    scheduleDeletion()
                     relate()
                     continue
                 }
@@ -359,7 +357,7 @@ function commit() {
     sync.length = 0
 
     // Deletetions
-    for (const fiber of queue.deletions) fiber.unmount()
+    for (const [fiber, removeNode] of queue.deletions) fiber.unmount(removeNode)
 
     // Update DOM
     root.walkDepth((fiber, nodeCursor, setNodeCursor) => {
