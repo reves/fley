@@ -18,6 +18,7 @@ export default class Fiber {
         this.parent = parent
         this.sibling = null
         this.child = null
+        this.isSvg = parent?.isSvg || this.type === 'svg'
 
         // Reconciliation
         this.alt = null
@@ -31,7 +32,7 @@ export default class Fiber {
             this.isComponent = true
             this.states = []
             this.effects = []
-            this.actual = [ this ] // ref to the latest cloned version
+            this.actual = [this] // ref to the latest cloned version
         }
     }
 
@@ -76,7 +77,6 @@ export default class Fiber {
     }
 
     reset() {
-        this.props.children &&= null // free memory
         this.alt = null
         this.memo = false
         this.insert = false
@@ -87,20 +87,26 @@ export default class Fiber {
      * Creates a DOM node bound to the Fiber.
      */
     createNode() {
-        if (this.type === Text) {
-            this.node = (nodes.text ??= document.createTextNode('')).cloneNode()
+        const doc = document
+        const type = this.type
+        const isSvg = this.isSvg
+        if (type === Text) {
+            this.node = isSvg
+                ? doc.createTextNode('')
+                : (nodes._ ??= doc.createTextNode('')).cloneNode()
             this.node.nodeValue = this.props.value
             return
         }
-        if (this.type === Inline) {
-            const tpl = nodes.template ??= document.createElement('template')
+        if (type === Inline) {
+            const tpl = nodes.template ??= doc.createElement('template')
             tpl.innerHTML = this.props.html
             this.node = tpl.content.firstChild
             tpl.innerHTML = ''
             return
         }
-        const node = nodes[this.type] ??= document.createElement(this.type)
-        this.node = node.cloneNode()
+        this.node = isSvg
+            ?  doc.createElementNS('http://www.w3.org/2000/svg', type)
+            : (nodes[type] ??= doc.createElement(type)).cloneNode()
     }
 
     /**
@@ -124,7 +130,7 @@ export default class Fiber {
                 setNodeCursor(this.getLastNode(onEach))
             } else {
                 // Schedule effects
-                for (const e of this.effects) e?.fn && (e.sync
+                for (const e of this.effects) e.fn && (e.sync
                     ? queue.sync.push(e.fn)
                     : queue.async.push(e.fn)
                 )
@@ -258,7 +264,7 @@ export default class Fiber {
                     node.parentNode === parentNode && toRemove.push(node)
                 }
             })
-            for (const node of toRemove) parentNode.removeChild(node)
+            for (let i=toRemove.length; i--; ) parentNode.removeChild(toRemove[i])
             return
         }
         this.walkDepth((fiber) => fiber.cleanup())
@@ -270,13 +276,13 @@ export default class Fiber {
      */
     cleanup() {
         if (this.isComponent) {
-            for (const e of this.effects) e?.cleanup && (e.sync
+            for (const e of this.effects) e.cleanup && (e.sync
                 ? e.cleanup()
                 : queue.async.push(e.cleanup)
             )
             this.states = null
             this.effects = null
-            this.actual = null
+            this.actual[0] = null
         } else if (this.props.ref) this.props.ref(null)
         this.props = null
     }

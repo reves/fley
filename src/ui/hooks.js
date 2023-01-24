@@ -1,62 +1,66 @@
 import { current, update, queue } from './renderer'
 
-// Current hook index of the current Fiber.
-let cursor = 0
-export const resetCursor = _ => cursor = 0
+// Most recent index of states/effects array.
+let cursorState = 0, cursorEffect = 0
+export const resetCursors = _ => cursorState = cursorEffect = 0
 
-// Checks if arrays are the same.
+// Checks if two arrays have the same values.
 const same = (prev, next) => prev
     && prev.length === next.length
     && prev.every((p, i) => p === next[i])
 
+// Calls the callback if the value has changed.
+const didChange = (prev, data, fn) => {
+    if (data === undefined) return
+    data = typeof data === 'function' ? data(prev) : data
+    if (typeof prev === 'object' || prev !== data) fn(data)
+}
+
+// Defines reactive actions on the target object.
+const defineActions = (target, actions, dispatch) => {
+    for (const name in actions) {
+        const action = actions[name]
+        target[name] = function(){dispatch(action, arguments)}
+    }
+    return target
+}
+
+const getStates = _ => [current.states, cursorState++]
+
 /**
  * State
  */
-const getStates = _ => [current.states, cursor++]
-
-export const useState = (initialValue) => useReducer(false, initialValue)
-
-export const useReducer = (reducer, initialValue, init) => {
+export const useState = (initial, actions) => {
     const [states, i] = getStates()
     if (i in states) return states[i]
-    if (typeof initialValue === 'function') initialValue = initialValue()
     const actual = current.actual
-    const getNextValue = reducer
-        ? (prev, data) => reducer(prev, data) // here data means action
-        : (prev, data) => ((typeof data === 'function') ? data(prev) : data)
-    const state = [
-        init ? init(initialValue) : initialValue,
-        (data) => {
-            const prev = state[0]
-            const next = getNextValue(prev, data)
-            if (prev === next && typeof prev !== 'object') return
-            state[0] = next
-            update(actual[0])
-        }
-    ]
+    const state = [typeof initial === 'function' ? initial() : initial]
+    const setState = (data) => didChange(state[0], data, (nextValue) => {
+        state[0] = nextValue
+        update(actual[0])
+    })
+    state[1] = actions
+        ? defineActions(setState, actions, (action, args) => {
+            setState(action(state[0], ...args))
+        })
+        : setState
     return states[i] = state
-}
-
-export const useRef = (initialValue) => {
-    const [states, i] = getStates()
-    if (i in states) return states[i]
-    const ref = function(value) {
-        if (arguments.length) ref.current = value
-        return ref.current
-    }
-    ref.current = initialValue
-    return states[i] = ref
 }
 
 export const useMemo = (fn, deps) => {
     const [states, i] = getStates()
-    const memo = states[i] ??= []
+    const memo = (states[i] ??= [])
     if (same(memo[1], deps)) return memo[0]
     memo[1] = deps
     return memo[0] = fn()
 }
 
 export const useCallback = (fn, deps) => useMemo(() => fn, deps)
+
+export const useRef = (value) => {
+    const [states, i] = getStates()
+    return states[i] ??= (data) => data === undefined ? value : (value = data)
+}
 
 /**
  * Effect
@@ -68,11 +72,8 @@ function Effect(sync = false) {
     this.deps = null
 }
 
-export const useEffect = (fn, deps) => _useEffect(fn, deps)
-export const useLayoutEffect = (fn, deps) => _useEffect(fn, deps, true)
-
-function _useEffect(fn, deps, sync) {
-    const effect = current.effects[cursor++] ??= new Effect(sync)
+const _useEffect = (fn, deps, sync) => {
+    const effect = current.effects[cursorEffect++] ??= new Effect(sync)
     if (same(effect.deps, deps)) {
         effect.fn = null
         return
@@ -83,7 +84,7 @@ function _useEffect(fn, deps, sync) {
         effect.fn = () => {
             effect.cleanup = fn()
             effect.deps = deps
-            effect.fn = null
+            effect.fn = null // free memory
         }
         return
     }
@@ -95,9 +96,34 @@ function _useEffect(fn, deps, sync) {
     }
 }
 
+export const useEffect = (fn, deps) => _useEffect(fn, deps)
+export const useLayoutEffect = (fn, deps) => _useEffect(fn, deps, true)
+
 /**
  * Store
  */
+export const createValue = (value, actions) => {
+    const watchers = new Set()
+    const setValue = (data) => didChange(value, data, (nextValue) => {
+        value = nextValue
+        new Set(watchers).forEach((actual) => update(actual[0]))
+    })
+    const ref = (data) => {
+        if (!current) return data === undefined ? value : setValue(data)
+        const actual = current.actual
+        useLayoutEffect(() => {
+            watchers.add(actual)
+            return () => watchers.delete(actual)
+        }, (actual[0].type === ref) ? [] : null)
+        return value
+    }
+    if (actions) {
+        defineActions(ref, actions, (action, args) => 
+            setValue(action(value, ...args)))
+    }
+    return ref
+}
+
 export const createStore = (StoreClass, ...args) => {
     // Wrap non-static methods (including extended ones)
     if (!StoreClass._ley) {
@@ -131,24 +157,17 @@ export const createStore = (StoreClass, ...args) => {
     const watchers = new Set
     store.action = (fn) => {
         fn && fn()
-        new Set(watchers)
-            .forEach(([actual, condition]) => {
-                const fiber = actual[0]
-                condition
-                    ? condition(fiber.props) && update(fiber)
-                    : update(fiber)
-            })
+        new Set(watchers).forEach((actual) => update(actual[0]))
     }
     store.action._watchers = watchers
     return store
 }
 
-export const useStore = (store, condition) => {
+export const useStore = (store) => {
     const actual = current.actual
     useLayoutEffect(() => {
         const watchers = store.action._watchers
-        const entry = [actual, condition]
-        watchers.add(entry)
-        return () => watchers.delete(entry)
+        watchers.add(actual)
+        return () => watchers.delete(actual)
     }, [])
 }

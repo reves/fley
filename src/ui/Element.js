@@ -35,7 +35,7 @@ export function normalize(children = [], result = [], keys = {}) {
 
         // Execute functions
         if (typeof child === 'function') {
-            normalize(child(), result, keys)
+            result.push(new Element(child, {}))
             continue
         }
 

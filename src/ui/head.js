@@ -6,7 +6,7 @@ const metaNode = isBrowser ? document.createElement('meta') : null
 let initialTitle = isBrowser ? document.title : ''
 let schemaNode = isBrowser ? document.createElement('script') : null
 const schemaType = 'application/ld+json'
-isBrowser && (schemaNode.type = schemaType)
+if (isBrowser) schemaNode.type = schemaType
 
 class Head {
 
@@ -26,11 +26,10 @@ class Head {
     schedule() {
         if (this.scheduled) return
         this.scheduled = true
-        if (hydration) {
-            queue.sync.push(this.hydrate.bind(this))
-            return
-        }
-        queue.sync.push(this.update.bind(this))
+        queue.sync.push(hydration
+            ? this.hydrate.bind(this)
+            : this.update.bind(this)
+        )
     }
 
     update() {

@@ -1,10 +1,10 @@
 import Fiber from './Fiber'
 import { normalize, Text, Inline } from './Element'
-import { resetCursor } from './hooks'
+import { resetCursors } from './hooks'
 import { isBrowser } from '../utils'
 
-// Is the current rendering process concurrent.
-// Defaults to `false` so the first rendering process is syncronous.
+// Is the current rendering process concurrent. Defaults to `false` so the first
+// rendering process is syncronous.
 let concurrent = false
 
 // Blocks concurrency.
@@ -39,7 +39,7 @@ export const queue = {
  */
 export function update(fiber, hydrate = false) {
     // Unmounted
-    if (fiber.type && !fiber.actual) return
+    if (!fiber) return
 
     // Another rendering process is already running
     if (root) {
@@ -85,7 +85,6 @@ function reset() {
     hydration = false
     root = null
     next = null
-    current = null
     if (idleCallbackId != null) {
         cancelIdleCallback(idleCallbackId)
         idleCallbackId = null
@@ -105,12 +104,12 @@ function reset() {
 function render(deadline) {
     // Main loop (sync)
     if (!concurrent) {
-        while (next) next = reconcile(current = next)
+        while (next) next = reconcile(next)
         return commit()
     }
 
     // Timed loop (concurrent)
-    while (deadline.timeRemaining() > 0 && next) next = reconcile(current = next)
+    while (deadline.timeRemaining() > 0 && next) next = reconcile(next)
     if (!next) return commit()
     idleCallbackId = requestIdleCallback(render)
 }
@@ -124,8 +123,10 @@ function reconcile(fiber) {
 
     if (!fiber.memo) {
         if (fiber.isComponent) {
-            resetCursor()
+            current = fiber
             reconcileChildren(fiber, normalize(type(fiber.props)), fiber.insert)
+            current = null
+            resetCursors()
         } else {
             if (!fiber.node && isBrowser && !hydration) fiber.createNode()
             if (type !== Text && type !== Inline) {
@@ -353,11 +354,15 @@ function commit() {
 
     // Call sync cleanups
     const sync = queue.sync
-    for (let i=sync.length-1; i>=0; i--) sync[i]()
+    for (let i=sync.length; i--; ) sync[i]()
     sync.length = 0
 
     // Deletetions
-    for (const [fiber, removeNode] of queue.deletions) fiber.unmount(removeNode)
+    const deletions = queue.deletions
+    for (let i=deletions.length; i--; ) {
+        const [fiber, removeNode] = deletions[i]
+        fiber.unmount(removeNode)
+    }
 
     // Update DOM
     root.walkDepth((fiber, nodeCursor, setNodeCursor) => {
@@ -368,7 +373,6 @@ function commit() {
 
     // Produce sync effects queued in the "Update DOM" step
     for (const effect of sync) effect()
-    sync.length = 0
 
     // Schedule async effects
     scheduleNextEffect()
@@ -377,7 +381,7 @@ function commit() {
     if (queue.update.length) {
         const updates = queue.update.slice()
         reset()
-        for (let i=updates.length-1; i>=0; i--) {
+        for (let i=updates.length; i--; ) {
             concurrent = false
             update(updates[i])
         }

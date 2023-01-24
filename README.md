@@ -39,7 +39,6 @@ npm i -D @babel/core @babel/plugin-transform-react-jsx
 
 ```javascript
 ley('Hello, World!') // By default, uses document.body as the root element.
-ley('Hello, World!', document.getElementById('app'))
 ```
 ```javascript
 import ley, { useState } from 'ley'
@@ -52,19 +51,16 @@ function App() {
     </>
 }
 
-ley(<App/>)
+ley(<App />, document.getElementById("app"))
 ```
-### Inline HTML
+#### Inline HTML
 
 ```javascript
 import ley, { Inline } from 'ley'
-import iconUser from './icon-user.svg' // e.g. import with Webpack as an asset/source
+import iconUser from './icon-user.svg' // e.g. using Webpack
 
-// (!) SVG elements can only be used as Inline elements.
-
-// The created DOM node will be reused if the 'html' string
+// The resulting DOM node is reused if the 'html' string
 // remains the same.
-
 ley(<>
     <Inline html={iconUser} width="16px"/>
     <Inline html="<ul> <li>One</li> <li>Two</li> </ul>" style="color: green;"/>
@@ -83,28 +79,25 @@ ley(<>
 Must start with an outer element.
 Plain text
 ```
-### Memoization
-When the value of the `memo` prop evaluates to `true`, it means that the props (attributes) and contents of the Element/Component have not changed since the last render.
+#### Optimization
+The `memo` prop tells if the props and contents have remained the same since the last render. In other words, when it evaluates to `true`, the Element/Component is skipped in the reconciler.
 
 ```javascript
 function Item({ name }) {
-    console.log('Item')
-
+    console.log('Item update')
     return <div>{ name }</div>
 }
 
 function List() {
-    console.log('List')
-    
-    const [items, setItems] = useState(['A', 'B', 'C'])
+    console.log('List update')
+    const [items, setItems] = useState(['a', 'b', 'c'])
 
     useEffect(() => {
-        setItems(['CHANGED', 'B', 'C']) // change an item
+        setItems([123, 'b', 'c']) // change an item
     }, [])
 
     // (!) Always use the `key` prop if the memoized Element/Component
     // can change its order among its siblings.
-    
     return <>
         <div memo> {/* same as memo={true} */}
             This div is always reused. Also it never changes its position,
@@ -122,18 +115,26 @@ function List() {
 
 ley(<List/>)
 
-// Without "memo" (on state update):
-// (1) List
-// (3) Item
+// Without "memo":
+// (1) List update
+// (3) Item update <-- every Item is updated
 
 // With "memo":
-// (1) List
-// (1) Item
+// (1) List update
+// (1) Item update <-- only the changed Item is updated
+```
+#### Synchronous mode only
+The `Sync` component disables the concurrency *(only globally at the moment)*.
+```javascript
+import ley, { Sync } from 'ley'
+import App from './App'
+
+ley(<Sync><App /></Sync>)
+// ley(<><Sync /><App /></>)
 ```
 
 ## Hooks
 - [useState](#usestate)
-- [useReducer](#usereducer)
 - [useEffect, useLayoutEffect](#useEffect)
 - [useRef](#useref)
 - [useMemo](#usememo)
@@ -146,13 +147,13 @@ ley(<List/>)
 
 ### useState
 ```javascript
-const [state, setState] = useState(initialState)
+const [state, setState] = useState(initialState, actions)
 ```
 ```javascript
 function Component() {
     const [count, setCount] = useState(0)
-    const inc = () => setCount(count + 1);
-    const dec = () => setCount(state => state - 1);
+    const inc = () => setCount(count + 1)
+    const dec = () => setCount(c => c - 1)
     return <>
         <p>Count: {count}</p>
         <button onClick={inc}> + </button>
@@ -160,28 +161,18 @@ function Component() {
     </>
 }
 ```
-
-### useReducer
+Example using *actions*
 ```javascript
-const [state, dispatch] = useReducer(reducer, initialState, init)
-```
-```javascript
-const reducer = (state, action) => {
-    switch (action) {
-        case 'inc': return state + 1
-        case 'dec': return state - 1
-        case 'res': return 0
-        default: throw new Error('Unexpected action')
-    }
-}
-
 function Component() {
-    const [count, dispatch] = useReducer(reducer, 0)
+    const [count, counter] = useState(0, {
+        inc: (c, amount) => c + amount,
+        dec: (c) => --c
+    })
     return <>
         <p>Count: {count}</p>
-        <button onClick={() => dispatch('inc')}> + </button>
-        <button onClick={() => dispatch('dec')}> - </button>
-        <button onClick={() => dispatch('res')}> Reset </button>
+        <button onClick={counter.inc(10)}> + </button>
+        <button onClick={counter.dec()}> - </button>
+        <button onClick={counter(0)}> Res </button>
     </>
 }
 ```
@@ -201,21 +192,20 @@ useEffect(() => {
 
 ### useRef
 ```javascript
-const ref = useRef(initialValue = null)
+const ref = useRef(initialValue)
 ```
-The current value can be received by `ref()` and set by `ref(newValue)`, or accesed directly via `ref.current`.
+The current value can be received by `ref()` and set by `ref(newValue)`.
 ```javascript
 function Component() {
     const input = useRef()
     const onButtonClick = () => input()?.focus()
-    // const onButtonClick = () => input.current?.focus()
     return <>
         <input ref={input} type="text" />
         <button onClick={onButtonClick}>Focus the input</button>
     </>
 }
 ```
-#### Callback Refs
+#### Callback ref
 ```javascript
 function Component() {
     let input = null
@@ -238,26 +228,14 @@ const memoizedCallback = useCallback(fn, [deps])
 ```
 
 ### useStore
+Subscribes the Component to the store's actions.
 ```javascript
-useStore(store, condition)
+useStore(store)
 ```
 ```javascript
 function Component() {
     useStore(router)
     return <div>The current route is {router.name}</div>
-}
-```
-If a _condition_ function is set, the component will be updated only when the _condition_ returns _true_ (this function is registered only once, on mount, so make sure to use the latest version of props received as argument).
-```javascript
-function Item({ id }) {
-    useStore(selector, (props) => 
-        selector.id === props.id || selector.lastId === props.id
-        // wrong: selector.id === id || selector.lastId === id
-    )
-
-    return <div class={selector.id === id ? 'selected' : ''}>
-        <a onClick={selector.select(id)}>Item</a>
-    </div>
 }
 ```
 
@@ -313,12 +291,80 @@ useSchema({
 ```
 
 ## Store
-A ___store___ is an object that contains a ___state___ (properties) and its ___actions___ (non-static methods).
-
+- [createValue](#createvalue)
 - [createStore](#createstore)
-- [Asynchronous actions](#asynchronous-actions)
+
+### createValue
+Creates a stored value (reference).
+```javascript
+const value = createValue(initial, actions)
+```
+```javascript
+import ley, { createState } from 'ley'
+
+const count = createValue(0, {
+    inc: c => ++c,
+})
+
+function App() {
+    return <>
+        <div>You clicked {count} times</div>
+        <button onClick={() => count.inc()}>+</button>
+        <button onClick={() => count(0)}>Res</button>
+    </>
+}
+
+ley(<App />)
+```
+
+#### `value` is a Component
+
+The `value` is a Component that wraps the stored value and only updates itself when the value changes.
+
+```javascript
+// Only the `value` Component will update on stored value change.
+function App() {
+    return <div>
+        Count: {value}
+        <p>This won't re-render.</p>
+    </div>
+}
+```
+```javascript
+// Concept (not an actual implementation)
+const value = function Value() {
+    const [count, setCount] = useState(0)
+    return count
+}
+```
+
+#### `value()` is a getter
+The `value()` is also a function that returns the stored value and, at the same time, makes the outer Component reactive to the stored value changes.
+```javascript
+// App will automatically update on stored value change.
+function App() {
+    return <div>
+        Count: {value()}
+        <p>This will re-render.</p>
+    </div>
+}
+```
+#### `value(newValue)` is a setter
+The `value(newValue)` is also a function that changes the stored value.
+```javascript
+const value = createValue(0)
+
+function App() {
+    return <div>
+        Count: {value()}
+        <p>This won't re-render.</p>
+        <button onClick={() => value((c) => ++c)}>+</button>
+    </div>
+}
+```
 
 ### createStore
+A ***store*** is an object that contains a ***state*** (properties) and its ***actions*** (non-static methods).
 ```javascript
 const store = createStore(ClassName, ...constructorArgs)
 ```
@@ -327,7 +373,6 @@ import ley, { createStore, useStore } from 'ley'
 import api from 'ley/api'
 
 class Theme {
-
     static styles = ['light', 'dark']
 
     constructor() {
@@ -363,7 +408,7 @@ function App() {
 ley(<App/>)
 ```
 
-### Asynchronous actions
+#### Asynchronous actions
 The reserved method `this.action([callback])` performs manual dispatch.
 ```javascript
 class Users {
