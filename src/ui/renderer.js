@@ -20,7 +20,7 @@ let root = null
 // Next fiber to be rendered.
 let next = null
 
-// The Fiber that is being rendered (hooks context).
+// The Component that is being rendered (hooks context).
 export let current = null
 
 // Scheduling

@@ -1,65 +1,154 @@
 import { current, update, queue } from './renderer'
+import { isFunction, isObject, isUndefined, defineProperty, getOwnProperties, seal } from '../utils'
 
-// Most recent index of states/effects array.
+// Most recent indexes of states & effects arrays.
 let cursorState = 0, cursorEffect = 0
 export const resetCursors = _ => cursorState = cursorEffect = 0
 
 // Checks if two arrays have the same values.
-const same = (prev, next) => prev
-    && prev.length === next.length
-    && prev.every((p, i) => p === next[i])
-
-// Calls the callback if the value has changed.
-const didChange = (prev, data, fn) => {
-    if (data === undefined) return
-    data = typeof data === 'function' ? data(prev) : data
-    if (typeof prev === 'object' || prev !== data) fn(data)
-}
-
-// Defines reactive actions on the target object.
-const defineActions = (target, actions, dispatch) => {
-    for (const name in actions) {
-        const action = actions[name]
-        target[name] = function(){dispatch(action, arguments)}
-    }
-    return target
-}
-
-const getStates = _ => [current.states, cursorState++]
+const same = (prev, next) =>
+    prev && prev.length === next.length && prev.every((p, i) => p === next[i])
 
 /**
  * State
  */
-export const useState = (initial, actions) => {
-    const [states, i] = getStates()
-    if (i in states) return states[i]
-    const actual = current.actual
-    const state = [typeof initial === 'function' ? initial() : initial]
-    const setState = (data) => didChange(state[0], data, (nextValue) => {
-        state[0] = nextValue
-        update(actual[0])
-    })
-    state[1] = actions
-        ? defineActions(setState, actions, (action, args) => {
-            setState(action(state[0], ...args))
-        })
-        : setState
-    return states[i] = state
-}
-
 export const useMemo = (fn, deps) => {
-    const [states, i] = getStates()
-    const memo = (states[i] ??= [])
-    if (same(memo[1], deps)) return memo[0]
-    memo[1] = deps
-    return memo[0] = fn()
+    const states = current.states
+    const i = cursorState++
+    const state = i in states
+        ? states[i]
+        : (states[i] = deps ? [fn(), deps] : fn())
+    if (!deps) return state
+    if (same(state[1], deps)) return state[0]
+    state[1] = deps
+    return state[0] = fn()
 }
 
 export const useCallback = (fn, deps) => useMemo(() => fn, deps)
 
-export const useRef = (value) => {
-    const [states, i] = getStates()
-    return states[i] ??= (data) => data === undefined ? value : (value = data)
+/**
+ * Ref
+ */
+let condition = null // condition to update the Component
+export const withCondition = (cond) => condition = cond
+
+const updateActual = (actual) => {
+    const fiber = actual[0]
+    if (!condition || condition(fiber.props, fiber.key)) update(fiber)
+}
+
+const watch = (watchers, ref) => {
+    const actual = current.actual
+    const isSelf = (ref && ref === actual[0].type)
+    if (isSelf || !watchers.has(actual)) {
+        useLayoutEffect(() => {
+            watchers.add(actual)
+            return () => watchers.delete(actual)
+        }, isSelf ? [] : null)
+    }
+}
+
+const createRef = (value, actions, watchers, watch) => {
+    if (isFunction(value)) value = value()
+
+    // Ref
+    const ref = (next) => {
+        if (current) {
+            watch && watch(watchers, ref)
+            return value
+        }
+        if (isUndefined(next)) return value
+        if (isFunction(next)) next = next(value)
+        if (watchers) {
+            if (value !== next || isObject(value) && isObject(next)) {
+                value = next
+                const list = Array.isArray(watchers) ? watchers : new Set(watchers)
+                list.forEach(updateActual)
+            }
+        } else value = next
+    }
+
+    // Actions
+    if (actions) {
+        let depth = 0
+        for (const name in actions) {
+            const action = actions[name]
+            ref[name] = isFunction(action)
+                ? function() {
+                    depth++
+                    const result = action.apply(this, depth === 1
+                        ? [value, ...arguments]
+                        : arguments)
+                    depth--
+                    if (depth) return result
+                    ref(result)
+                    condition = null
+                    return this
+                }
+                : action
+        }
+    }
+
+    return seal(ref)
+}
+
+export const useRef = (initial) => useMemo(() => createRef(initial))
+
+export const useState = (initial, actions) => {
+    const ref = useMemo(() => createRef(initial, actions, [current.actual]))
+    return [ref(), ref]
+}
+
+export const createValue = (initial, actions) => {
+    const watchers = new Set()
+    return createRef(initial, actions, watchers, watch)
+}
+
+export const createStore = (Store, ...args) => {
+    const watchers = new Set()
+    const store = new Store(...args)
+
+    // Properties
+    for (const prop of getOwnProperties(store)) {
+        let value = store[prop]
+        defineProperty(store, prop, {
+            get() {
+                current && watch(watchers)
+                return value
+            },
+            set(next) { value = next },
+            enumerable: true
+        })
+    }
+
+    // Actions
+    let depth = 0
+    let prototype = Store.prototype
+    while (prototype.constructor !== Object) {
+        for (const name of getOwnProperties(prototype).slice(1)) {
+            const action = prototype[name]
+            defineProperty(store, name, {
+                value() {
+                    depth++
+                    const result = action.apply(this, arguments)
+                    depth--
+                    if (depth) return result
+                    if (result !== null) this.action()
+                    return this
+                }
+            })
+        }
+        prototype = Object.getPrototypeOf(prototype)
+    }
+    defineProperty(store, 'action', {
+        value(fn) {
+            fn && fn()
+            new Set(watchers).forEach(updateActual)
+            condition = null
+        }
+    })
+
+    return seal(store)
 }
 
 /**
@@ -77,14 +166,14 @@ const _useEffect = (fn, deps, sync) => {
     if (same(effect.deps, deps)) {
         effect.fn = null
         return
-    }
+    } 
     const cleanup = effect.cleanup
     if (sync) {
         cleanup && queue.sync.push(cleanup)
         effect.fn = () => {
             effect.cleanup = fn()
             effect.deps = deps
-            effect.fn = null // free memory
+            effect.fn = null // free retained memory
         }
         return
     }
@@ -98,76 +187,3 @@ const _useEffect = (fn, deps, sync) => {
 
 export const useEffect = (fn, deps) => _useEffect(fn, deps)
 export const useLayoutEffect = (fn, deps) => _useEffect(fn, deps, true)
-
-/**
- * Store
- */
-export const createValue = (value, actions) => {
-    const watchers = new Set()
-    const setValue = (data) => didChange(value, data, (nextValue) => {
-        value = nextValue
-        new Set(watchers).forEach((actual) => update(actual[0]))
-    })
-    const ref = (data) => {
-        if (!current) return data === undefined ? value : setValue(data)
-        const actual = current.actual
-        useLayoutEffect(() => {
-            watchers.add(actual)
-            return () => watchers.delete(actual)
-        }, (actual[0].type === ref) ? [] : null)
-        return value
-    }
-    if (actions) {
-        defineActions(ref, actions, (action, args) => 
-            setValue(action(value, ...args)))
-    }
-    return ref
-}
-
-export const createStore = (StoreClass, ...args) => {
-    // Wrap non-static methods (including extended ones)
-    if (!StoreClass._ley) {
-        StoreClass._ley = true
-        const prototype = StoreClass.prototype
-
-        // Get methods
-        let methods = []
-        let p = prototype
-        while (p.constructor !== Object) {
-            methods.push(...Object.getOwnPropertyNames(p))
-            p = Object.getPrototypeOf(p)
-        }
-
-        // Wrap methods
-        let depth = 0
-        for (const method of methods.filter(m => m !== 'constructor')) {
-            const action = prototype[method]
-            prototype[method] = function() {
-                depth++
-                const result = action.apply(this, arguments)
-                depth--
-                if (depth === 0 && result !== null) this.action()
-                return depth === 0 ? this : result
-            }
-        }
-    }
-
-    // Set up the store and watchers list
-    const store = new StoreClass(...args)
-    const watchers = new Set
-    store.action = (fn) => {
-        fn && fn()
-        new Set(watchers).forEach((actual) => update(actual[0]))
-    }
-    store.action._watchers = watchers
-    return store
-}
-
-export const useStore = (store) => {
-    const actual = current.actual
-    useLayoutEffect(() => {
-        const watchers = store.action._watchers
-        watchers.add(actual)
-        return () => watchers.delete(actual)
-    }, [])
-}

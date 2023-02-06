@@ -7,10 +7,7 @@ export default function ley(children, container = document.body) {
     update(new Fiber( new Element(null, { children }), container))
 }
 
-export const Sync = ({ children }) => {
-    setSyncOnly()
-    return children
-}
+export const Sync = ({ children }) => setSyncOnly() && children
 
 export {
     useEffect,
@@ -21,6 +18,6 @@ export {
     useRef,
     createValue,
     createStore,
-    useStore
+    withCondition
 } from './ui/hooks'
 export { Fragment, Inline } from './ui/Element'

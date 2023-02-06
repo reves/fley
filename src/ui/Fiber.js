@@ -1,5 +1,6 @@
 import { Text, Inline } from './Element'
 import { hydration, queue } from "./renderer"
+import { isFunction } from '../utils'
 
 const nodes = {} // nodes pool
 export const isReserved = prop => prop === 'children' || prop === 'html' || prop === 'memo'
@@ -28,7 +29,7 @@ export default class Fiber {
         this.skip = false
 
         // Component
-        if (typeof this.type === 'function') {
+        if (isFunction(this.type)) {
             this.isComponent = true
             this.states = []
             this.effects = []
@@ -50,7 +51,7 @@ export default class Fiber {
                 default:
                     const memo = nextProps.memo
                     if (prevProps.memo && memo) {
-                        memoize = (typeof memo === 'function')
+                        memoize = (isFunction(memo))
                             ? memo(prevProps, nextProps)
                             : true
                     }
@@ -280,11 +281,8 @@ export default class Fiber {
                 ? e.cleanup()
                 : queue.async.push(e.cleanup)
             )
-            this.states = null
-            this.effects = null
             this.actual[0] = null
         } else if (this.props.ref) this.props.ref(null)
-        this.props = null
     }
 
     /**

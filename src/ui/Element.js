@@ -1,3 +1,5 @@
+import { isFunction, isObject } from "../utils"
+
 /**
  * JSX Element types
  */
@@ -34,13 +36,13 @@ export function normalize(children = [], result = [], keys = {}) {
         }
 
         // Execute functions
-        if (typeof child === 'function') {
+        if (isFunction(child)) {
             result.push(new Element(child, {}))
             continue
         }
 
         // Text Element
-        if (typeof child !== 'object') {
+        if (!isObject(child)) {
             const prev = result[result.length-1]
             if (prev && prev.type === Text) {
                 prev.props.value += child

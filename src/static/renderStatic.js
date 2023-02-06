@@ -4,6 +4,7 @@ import { update, setSyncOnly } from '../ui/renderer'
 import router from '../stores/router'
 import i18n, { getLocales } from '../stores/i18n'
 import head from '../ui/head'
+import { isObject } from '../utils'
 
 const voidElements = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'source', 'track', 'wbr']
 
@@ -104,7 +105,7 @@ function metaToString(meta) {
 function schemaToString(schema) {
     return schema
         ? '<script type="application/ld+json">'
-            + JSON.stringify(schema, (_, v) => typeof v === 'object' ? v : escape(v))
+            + JSON.stringify(schema, (_, v) => isObject(v) ? v : escape(v))
             + '</script>'
         : ''
 }

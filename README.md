@@ -5,7 +5,7 @@ Frontend JavaScript web framework based on [JSX syntax](https://github.com/faceb
 - [Installation](#installation)
 - [Usage](#usage)
 - [Hooks](#hooks)
-- [Store (global state)](#store)
+- [Global state](#global-state)
 - [Router](#router)
 - [I18n](#i18n)
 - [API Client](#api-client)
@@ -129,8 +129,7 @@ The `Sync` component disables the concurrency *(only globally at the moment)*.
 import ley, { Sync } from 'ley'
 import App from './App'
 
-ley(<Sync><App /></Sync>)
-// ley(<><Sync /><App /></>)
+ley(<Sync><App /></Sync>) // or ley(<><Sync /><App /></>)
 ```
 
 ## Hooks
@@ -139,7 +138,6 @@ ley(<Sync><App /></Sync>)
 - [useRef](#useref)
 - [useMemo](#usememo)
 - [useCallback](#usecallback)
-- [useStore](#usestore)
 - [Metadata](#metadata)
     - [useTitle](#usetitle)
     - [useMeta](#usemeta)
@@ -227,18 +225,6 @@ const memoizedResult = useMemo(fn, [deps])
 const memoizedCallback = useCallback(fn, [deps])
 ```
 
-### useStore
-Subscribes the Component to the store's actions.
-```javascript
-useStore(store)
-```
-```javascript
-function Component() {
-    useStore(router)
-    return <div>The current route is {router.name}</div>
-}
-```
-
 ### Metadata
 Managing the metadata in the `<head>` section.
 ```javascript
@@ -290,9 +276,10 @@ useSchema({
 </script>
 ```
 
-## Store
+## Global state
 - [createValue](#createvalue)
 - [createStore](#createstore)
+- [withCondition](#withcondition)
 
 ### createValue
 Creates a stored value (reference).
@@ -302,14 +289,17 @@ const value = createValue(initial, actions)
 ```javascript
 import ley, { createState } from 'ley'
 
-const count = createValue(0, {
+const actionsDescriptor = {
     inc: c => ++c,
-})
+    dec: c => --c
+}
+const count = createValue(0, actionsDescriptor)
 
 function App() {
     return <>
         <div>You clicked {count} times</div>
         <button onClick={() => count.inc()}>+</button>
+        <button onClick={() => count.dec()}>-</button>
         <button onClick={() => count(0)}>Res</button>
     </>
 }
@@ -317,59 +307,58 @@ function App() {
 ley(<App />)
 ```
 
-#### `value` is a Component
+#### `count` is a Component
 
-The `value` is a Component that wraps the stored value and only updates itself when the value changes.
+The `count` is a Component that wraps the stored value and only re-renders when the stored value changes.
 
 ```javascript
-// Only the `value` Component will update on stored value change.
 function App() {
-    return <div>
-        Count: {value}
-        <p>This won't re-render.</p>
-    </div>
+    return <>
+        Count: {count}
+        <p>This won't re-render when the stored value changes.</p>
+    </>
+}
+
+// Under the hood (not an actual implementation)
+const count = function() {
+    const [value, setValue] = useState(0)
+    return value
 }
 ```
+
+#### `count()` is also a getter
+The `count()` is a function that returns the stored value and, at the same time, makes the outer Component reactive to the stored value changes.
 ```javascript
-// Concept (not an actual implementation)
-const value = function Value() {
-    const [count, setCount] = useState(0)
-    return count
+function App() {
+    return <>
+        Count: {count()}
+        <p>This will re-render each time the stored value changes.</p>
+    </>
 }
 ```
-
-#### `value()` is a getter
-The `value()` is also a function that returns the stored value and, at the same time, makes the outer Component reactive to the stored value changes.
+#### `count(newValue)` is also a setter
+The `count(newValue)` is a function that changes the stored value.
 ```javascript
-// App will automatically update on stored value change.
 function App() {
-    return <div>
-        Count: {value()}
-        <p>This will re-render.</p>
-    </div>
-}
-```
-#### `value(newValue)` is a setter
-The `value(newValue)` is also a function that changes the stored value.
-```javascript
-const value = createValue(0)
-
-function App() {
-    return <div>
-        Count: {value()}
-        <p>This won't re-render.</p>
-        <button onClick={() => value((c) => ++c)}>+</button>
-    </div>
+    return <>
+        Count: {count()}
+        <button onClick={() => count(c => c+2)}>+2</button>
+        <button onClick={() => count(0)}>Res</button>
+    </>
 }
 ```
 
 ### createStore
-A ***store*** is an object that contains a ***state*** (properties) and its ***actions*** (non-static methods).
+A ***store*** is an instance of the Store class, it contains the ***state*** (properties created in the constructor) and the ***actions*** (non-static methods of the class, including inherited).
+
 ```javascript
-const store = createStore(ClassName, ...constructorArgs)
+const store = createStore(StoreClass, ...constructorArgs)
 ```
+
+By accessing any property of the store inside a Component, that Component automatically becomes reactive to the actions.
+
 ```javascript
-import ley, { createStore, useStore } from 'ley'
+import ley, { createStore } from 'ley'
 import api from 'ley/api'
 
 class Theme {
@@ -381,7 +370,7 @@ class Theme {
 
     toggleStyle() {
         // 1) Inner calls to other actions do not cause additional rendering.
-        // 2) Returning "null" from the most outer action prevents rendering.
+        // 2) Returning "null" from the initially called action prevents rendering.
         return this.style === 'light'
             ? this.setStyle('dark')
             : this.setStyle('light')
@@ -398,7 +387,6 @@ class Theme {
 const theme = createStore(Theme)
 
 function App() {
-    useStore(theme)
     return <>
         <div>The current theme style is {theme.style}</div>
         <button onClick={() => theme.toggleStyle()}>Change theme style</button>
@@ -412,7 +400,6 @@ ley(<App/>)
 The reserved method `this.action([callback])` performs manual dispatch.
 ```javascript
 class Users {
-
     constructor() {
         this.users = []
     }
@@ -426,9 +413,39 @@ class Users {
             //    this.users = res.list
             // })
         })
-        return null // prevent rendering at the moment
+        return null // prevent rendering at this moment
     }
 }
+```
+
+### withCondition
+```javascript
+withCondition((props, key) => /* ... */)
+```
+This is a special hook for actions that sets a condition that will be applied to each (subscribed) Component to determine if it should re-render.
+
+```javascript
+import ley, { createStore, createValue, withCondition } from 'ley'
+
+// or createStore...
+const selector = createValue(null, {
+    select: (prev, next) => {
+        withCondition((props) => props.id === prev || props.id === next)
+        return next
+    }
+})
+
+function Row({ id }) {
+    return <div class={selector() === id ? "selected" : ""}>
+        <span onClick={() => selector.select(id)}>Id: {id}</span>
+    </div>
+}
+
+ley(<>
+    <Row id={1} />
+    <Row id={2} />
+    <Row id={3} />
+</>)
 ```
 
 ## Router
@@ -442,7 +459,7 @@ class Users {
 - [router.go()](#routergo)
 
 ```javascript
-import ley, { useStore } from 'ley'
+import ley from 'ley'
 import router from 'ley/router'
 
 router.define({
@@ -451,8 +468,6 @@ router.define({
 })
 
 function App() {
-    useStore(router)
-
     const page = router.name === 'home'
         ? 'Home Page'
         : (router.name === 'about'
@@ -492,7 +507,7 @@ router.go('/about', () => window.scrollTo(0, 0))
 - [Configuration](#configuration)
 - [Formatting](#formatting)
 ```javascript
-import ley, { useStore } from 'ley'
+import ley from 'ley'
 import i18n, { t } from 'ley/i18n'
 
 const en = { message: { hello: 'Hello!' } }
@@ -504,7 +519,6 @@ i18n.define({
 })
 
 function App() {
-    useStore(i18n)
     return <>
         <div>{ t('message.hello') }</div>
         <button onClick={() => i18n.setLocale('en-US')}>EN</button>
