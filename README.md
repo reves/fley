@@ -123,13 +123,13 @@ ley(<List/>)
 // (1) List update
 // (1) Item update <-- only the changed Item is updated
 ```
-#### Synchronous mode only
-The `Sync` component disables the concurrency *(only globally at the moment)*.
+#### Synchronous rendering
+The `Sync` component disables concurrency when rendering its subtree. This way it allows everything it wraps to be rendered synchronously.
 ```javascript
 import ley, { Sync } from 'ley'
 import App from './App'
 
-ley(<Sync><App /></Sync>) // or ley(<><Sync /><App /></>)
+ley(<Sync><App /></Sync>)
 ```
 
 ## Hooks

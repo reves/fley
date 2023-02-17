@@ -1,13 +1,13 @@
 import Fiber from './ui/Fiber'
 import Element from './ui/Element'
-import { update, setSyncOnly } from './ui/renderer'
+import { update, current } from './ui/renderer'
 
 export default function ley(children, container = document.body) {
     container.innerHTML = ''
     update(new Fiber( new Element(null, { children }), container))
 }
 
-export const Sync = ({ children }) => setSyncOnly() && children
+export const Sync = ({ children }) => (current.sync = true) && children
 
 export {
     useEffect,

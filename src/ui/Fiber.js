@@ -20,6 +20,7 @@ export default class Fiber {
         this.sibling = null
         this.child = null
         this.isSvg = parent?.isSvg || this.type === 'svg'
+        this.sync = elementOrFiber.sync || parent?.sync
 
         // Reconciliation
         this.alt = null

@@ -3,13 +3,10 @@ import { normalize, Text, Inline } from './Element'
 import { resetCursors } from './hooks'
 import { isBrowser } from '../utils'
 
-// Is the current rendering process concurrent. Defaults to `false` so the first
-// rendering process is syncronous.
-let concurrent = false
-
-// Blocks concurrency.
-let syncOnly = false
-export const setSyncOnly = _ => syncOnly = true
+// Current level of a synchronous subtree. Defaults to 0, but initialized with 
+// a surplus so that the root is considered a "synchronous subtree". Thus, the 
+// first render is synchronous.
+let synchronous = 1
 
 // Is hydration process.
 export let hydration = false
@@ -72,16 +69,17 @@ export function update(fiber, hydrate = false) {
     hydration = hydrate
     root = fiber.clone()
     next = root
-    if (!concurrent) return render()
+    if (root.sync) synchronous++
+    if (synchronous) return render()
     idleCallbackId = requestIdleCallback(render)
 }
 
 /**
  * Cancels the rendering process and resets the data.
- */
+ */ 
 function reset() {
     // Renderer
-    if (!syncOnly) concurrent = true
+    synchronous = 0
     hydration = false
     root = null
     next = null
@@ -102,15 +100,10 @@ function reset() {
  * Renders the fiber tree.
  */
 function render(deadline) {
-    // Main loop (sync)
-    if (!concurrent) {
-        while (next) next = reconcile(next)
-        return commit()
+    while (synchronous || deadline.timeRemaining() > 0) {
+        next = reconcile(next)
+        if (!next) return commit()
     }
-
-    // Timed loop (concurrent)
-    while (deadline.timeRemaining() > 0 && next) next = reconcile(next)
-    if (!next) return commit()
     idleCallbackId = requestIdleCallback(render)
 }
 
@@ -135,10 +128,12 @@ function reconcile(fiber) {
         }
     }
 
+    if (fiber.sync) synchronous++
     if (fiber.child && !fiber.memo) return fiber.child
     while (fiber) {
+        if (fiber.sync) synchronous--
+        if (fiber === root) return null
         if (fiber.sibling) return fiber.sibling
-        if (fiber.parent === root) return null
         fiber = fiber.parent
     }
 }
@@ -382,7 +377,7 @@ function commit() {
         const updates = queue.update.slice()
         reset()
         for (let i=updates.length; i--; ) {
-            concurrent = false
+            synchronous = 1
             update(updates[i])
         }
         return
