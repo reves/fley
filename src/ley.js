@@ -8,7 +8,7 @@ export default function ley(children, container = document.body) {
 }
 
 export const Sync = ({ children }) => (current.sync = true) && children
-
+export { Inline } from './ui/Element'
 export {
     useEffect,
     useLayoutEffect,
@@ -20,4 +20,3 @@ export {
     createStore,
     withCondition
 } from './ui/hooks'
-export { Fragment, Inline } from './ui/Element'

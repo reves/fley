@@ -8,7 +8,7 @@ Frontend JavaScript web framework based on [JSX syntax](https://github.com/faceb
 - [Global state](#global-state)
 - [Router](#router)
 - [I18n](#i18n)
-- [API Client](#api-client)
+- [API client](#api-client)
 - [Pre-rendering (SSR)](#pre-rendering-ssr)
 
 ## Installation
@@ -287,7 +287,7 @@ Creates a stored value (reference).
 const value = createValue(initial, actions)
 ```
 ```javascript
-import ley, { createState } from 'ley'
+import ley, { createValue } from 'ley'
 
 const actionsDescriptor = {
     inc: c => ++c,
@@ -422,7 +422,7 @@ class Users {
 ```javascript
 withCondition((props, key) => /* ... */)
 ```
-This is a special hook for actions that sets a condition that will be applied to each (subscribed) Component to determine if it should re-render.
+This is a special hook that can be used inside actions. It sets a condition that will be applied to each (subscribed) Component to determine if it should re-render.
 
 ```javascript
 import ley, { createStore, createValue, withCondition } from 'ley'
@@ -723,7 +723,7 @@ t('message', { a: 'a pencil', b: 10, c: { x: { y: 49.99 } } })
 // We bought a pencil and 10 books at the price of $49.99
 ```
 
-## API Client
+## API client
 - [api.init()](#apiinit)
 - [api.get()](#apiget)
 - [api.post()](#apipost)
@@ -739,16 +739,19 @@ import api from 'ley/api'
 api.init({ baseURL: 'https://api.example.com'})
 
 api.get('/books?id=1')
-    .success((response, status, event) => {
-        console.log(response.title)
-        console.log(response.author)
+    .success((data) => {
+        console.log(data.title)
+        console.log(data.author)
     })
-    .fail((response, status, event) => {
+    .fail((response) => {
         console.log("Couldn't find the book.")
     })
-    .error((response, status, event) => {
+    .error((response) => {
         console.log("An error occured. Please try again later.")
     })
+
+// api.get('https://example.com/api/...')
+// api.get('//example.com/api/...')
 ```
 
 #### api.init()
@@ -816,26 +819,103 @@ const api = new Api({
 
 ### Events
 ```javascript
-api.get('/endpoint')
+api.get('/endpoint') // returns a modified Promise
     .progress((event) => {
         // XMLHttpRequest progress event
     })
-    .success((response, status, event) => {
+    .success((data) => { // note the "data" argument for this handler
         // XMLHttpRequest load event
         // status 2xx
     })
-    .fail((response, status, event) => {
+    .fail((response) => {
         // XMLHttpRequest load event
         // status 4xx
     })
-    .error((response, status, event) => {
+    .error((response) => {
         // XMLHttpRequest error/timeout/load event
         // status != 2xx && status != 4xx
+        // (+) When .fail() isn't set, .error() handles failed requests
     })
-    .always((response, status, event) => {
+    .always((response) => {
         // XMLHttpRequest loadend event
-        // (this event fires even after cancellation)
+        // Fires after .abort() call
+        // (+) When .fail/error() isn't set, .awlays() prevents Promise rejection
     })
+
+// Event handler argument types:
+// a) response = {data: ..., status: ...}
+// b) data === response.data
+
+// Event handlers execution precedence:
+// 1) .fail()
+// 2) .error()
+// 3) .success()
+// 4) .always()
+// 5) Promise.reject() - unhandled errors and .always() not set
+// 6) Promise.resolve() - no errors, or errors handled with .always()
+```
+
+### Multiple requests (concurrently and/or sequentially)
+```javascript
+const handler = api
+
+    // CONCURRENT REQUESTS:
+
+    // Run request #1
+    .get('/todos/1')
+    // Set progress event handler for request #1
+    .progress(event => console.log('Progress Todo: ', event))
+
+    // Run request #2
+    .get('/posts/123') 
+    // Set progress event handler for request #2
+    .progress(event => console.log('Progress Post: ', event))
+
+    // Set event handlers for previously chained requests
+    // (these handlers will execute only after all requests finished)
+    .success((todo, post) => {
+        todo && console.log('Success Todo: ', todo.title)
+        post && console.log('Success Post: ', post.title)
+        // When a value is returned from .success(),
+        // it is passed to the next .then()
+        return [todo?.title, post?.title]
+    })
+    .fail((res1, res2) => {
+        res1 && console.log('Invalid Todo: ', res1.data, res1.status)
+        res2 && console.log('Invalid Post: ', res2.data, res2.status)
+    })
+    .error((res1, res2) => {
+        res1 && console.log('Error loading Todo: ', res1.data, res1.status)
+        res2 && console.log('Error loading Post: ', res2.data, res2.status)
+    })
+    .always((res1, res2) => {
+        if (!res1 && !res2) return console.log('All requests aborted!')
+        console.log('Whether success or not...')
+        // When a value is returned from .always(),
+        // it is passed to the next .then() ONLY IF
+        // .success() did NOT already return a value
+        return [res1?.data.title, res2?.data.title] // ignored
+    })
+
+    // SEQUENTIAL REQUESTS (in relation to previous ones):
+
+    // Here the argument represents the returned
+    // value from .success(). (!) Note that the default
+    // argument value is an Array of responses [res1, res2, ...]
+    .then(([todoT, postT]) => {
+        if (!todoT && !postT) return
+        return api
+            .post('/todos/1', {title: todoT + ' [seen]'})
+            .post('/posts/123', {title: postT + ' [seen]'})
+            .always(_=>{})
+    })
+    .then(/*...*/)
+    
+    .catch((responses) => {
+        console.log('At least one unhandled error in', responses)
+    })
+
+// handler.abort() // Abort all requests if needed
 ```
 
 ### Cancellation
