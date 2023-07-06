@@ -154,7 +154,7 @@ export default class Fiber {
             return
         }
 
-        // Insert or move the node, or replace another node
+        // Insert or move the node, or replace an another node
         if (this.insert) this.insertNode(nodeCursor)
 
         // Update attributes

@@ -730,6 +730,7 @@ t('message', { a: 'a pencil', b: 10, c: { x: { y: 49.99 } } })
 - [api.request()](#apirequest)
 - [Instance](#instance)
 - [Events](#events)
+- [Multiple requests](#multiple-requests-concurrently-andor-sequentially)
 - [Cancellation](#cancellation)
 
 
@@ -928,9 +929,9 @@ handler.abort()
 
 ## Pre-rendering (SSR)
 ### General idea
-1. Compile at build time a static HTML page for each defined route
-2. On the server, match the route and serve corresponding static HTML
-4. Hydrate on the client side
+1. Compile at build time a JSON file with static HTML for each defined route.
+2. On the server, match the URL path against each route's RegEx and serve corresponding static HTML.
+3. Hydrate on the client side.
 
 <!--A template engine can be used on the server side to include the data. This can be achieved by first setting the initial state values to template variables in the application:
 ```javascript
@@ -1020,7 +1021,7 @@ const fs = require('fs')
 fs.writeFileSync(`${serverPath}/routes.json`, JSON.stringify(routes))
 ```
 
-####  5. Set up the server to serve the HTML of the corresponding route
+####  5. Set up the server to serve the HTML of the corresponding route.
 
 ### Final example
 `index.html` – The main HTML template.
@@ -1092,8 +1093,8 @@ module.exports = {
 `index.php` – The server matches the current request URL path against the regex of each route until finds and returns the corresponding static HTML page. The hydration will happen on the client side.
 ```php
 <?php
+$path = strtok($_SERVER["REQUEST_URI"], '?'); // get path part from URI
 $routes = json_decode(file_get_contents("./routes.json"), true);
-$path = strtok($_SERVER["REQUEST_URI"], '?');
 
 foreach ($routes as $name => $route) {
     $regex = $route['regex'];

@@ -1,6 +1,6 @@
 import Fiber, { isReserved } from '../ui/Fiber'
 import Element, { Text } from '../ui/Element'
-import { update, setSyncOnly } from '../ui/renderer'
+import { update } from '../ui/renderer'
 import router from '../stores/router'
 import i18n, { getLocales } from '../stores/i18n'
 import head from '../ui/head'
@@ -19,8 +19,6 @@ export default function renderStatic(children) {
     const routes = { ...router.routes, "": new RegExp }
     const locales = getLocales().map(([code, _]) => code)
 
-    setSyncOnly()
-
     for (const name in routes) {
         router.name = name
         const regex = routes[name]
@@ -29,12 +27,16 @@ export default function renderStatic(children) {
         if (locales.length) {
             for (const locale of locales) {
                 if (!i18n.setLocale(locale)) continue
-                const [root, reset] = update(new Fiber(new Element(null, { children })))
+                const fiber = new Fiber(new Element(null, { children }))
+                fiber.sync = true
+                const [root, reset] = update(fiber)
                 dom[locale] = new RouteDOM(head, root)
                 reset()
             }
         } else {
-            const [root, reset] = update(new Fiber(new Element(null, { children })))
+            const fiber = new Fiber(new Element(null, { children }))
+            fiber.sync = true
+            const [root, reset] = update(fiber)
             dom = new RouteDOM(head, root)
             reset()
         }
