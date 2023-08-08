@@ -35,8 +35,7 @@ export const queue = {
  * Initiates the rendering process of the fiber subtree.
  */
 export function update(fiber, hydrate = false) {
-    // Unmounted
-    if (!fiber) return
+    if (!fiber) return // unmounted
 
     // Another rendering process is already running
     if (root) {
@@ -284,7 +283,7 @@ function reconcileChildren(parent, elements = [], parentInsert = false) {
 
                 // Different type
                 fiber = new Fiber(element, null, parent, alt)
-                scheduleDeletion()
+                scheduleDeletion(fiber.isComponent)
                 relate()
                 continue
             }
