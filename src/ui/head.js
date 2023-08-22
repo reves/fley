@@ -1,84 +1,112 @@
-import { hydration, queue } from './renderer'
-import { isBrowser } from '../utils'
+import Element from './Element'
+import { createRoot } from './Fiber'
+import { update, queue, hydration } from './renderer'
+import { createValue } from './hooks'
+import { isPlaceholder } from '../utils'
 
-const headNode = isBrowser ? document.head : null
-const metaNode = isBrowser ? document.createElement('meta') : null
-let initialTitle = isBrowser ? document.title : ''
-let schemaNode = isBrowser ? document.createElement('script') : null
-const schemaType = 'application/ld+json'
-if (isBrowser) schemaNode.type = schemaType
-
-class Head {
-
-    constructor() {
-        this.reset()
-        this.metaNodes = []
-        queue.reset.push(this.reset.bind(this))
-    }
-
-    reset() {
-        this.title = initialTitle
-        this.meta = []
-        this.schema = null
-        this.scheduled = false
-    }
-
-    schedule() {
-        if (this.scheduled) return
-        this.scheduled = true
-        queue.sync.push(hydration
-            ? this.hydrate.bind(this)
-            : this.update.bind(this)
-        )
-    }
-
-    update() {
-        // Title
-        document.title = this.title
-
-        // Meta
-        for(const node of this.metaNodes) headNode.removeChild(node)
-        this.metaNodes.length = 0
-        for (const props of this.meta) {
-            const node = metaNode.cloneNode()
-            for (const prop in props) node.setAttribute(prop, props[prop])
-            this.metaNodes.push(node)
-            headNode.appendChild(node)
-        }
-
-        // Schema
-        if (this.schema) {
-            schemaNode.text = JSON.stringify(this.schema)
-            headNode.appendChild(schemaNode)
-        } else if (schemaNode.text) {
-            headNode.removeChild(schemaNode)
-            schemaNode.text = ''
+function createHeadValue(initial) {
+    let scheduled = false
+    const value = createValue(initial)
+    value.root = createRoot(value)
+    value.next = initial
+    value.schedule = function(next, onCommit) {
+        this.next = next ?? initial
+        if (!scheduled) {
+            scheduled = true
+            queue.sync.push(() => onCommit(this.next))
+            queue.reset.push(() => {
+                scheduled = false
+                this.next = initial
+            })
         }
     }
-
-    hydrate() {
-        // Title
-        initialTitle = ''
-
-        // Meta
-        for (const props of this.meta) {
-            for (const prop in props) {
-                if (prop === 'content') continue
-                const query = 'meta[' + prop + '="' + props[prop] + '"]'
-                const node = headNode.querySelector(query)
-                node && this.metaNodes.push(node)
-                break
-            }
-        }
-
-        // Schema
-        const node = headNode.querySelector('script[type="' + schemaType + '"]')
-        if (node) schemaNode = node
-    }
+    return value
 }
 
-const head = new Head
-export const useTitle = (title = '') => { head.title = title; head.schedule() }
-export const useMeta = (meta = []) => { head.meta = meta; head.schedule() }
-export const useSchema = (schema) => { head.schema = schema; head.schedule() }
-export default head
+/**
+ * Title
+ */
+export let title = null
+let defaultTitle = ''
+
+export const useTitle = (next) => {
+    title ??= createHeadValue(defaultTitle)
+    title.schedule(next, updateTitle)
+}
+
+function updateTitle(next) {
+    title(next)
+    const root = title.root
+    if (root.node) return
+    defaultTitle = document.title
+    if (hydration) {
+        if (isPlaceholder(next)) next(defaultTitle)
+        defaultTitle = ''
+    }
+    document.title = '' // ensures title node exists
+    root.node = document.head.querySelector('title')
+    update(root)
+}
+
+/**
+ * Schema
+ */
+export let schema = null
+const SCHEMA_TYPE = 'application/ld+json'
+
+export const useSchema = (next) => {
+    schema ??= createHeadValue('')
+    schema.schedule(next, updateSchema)
+}
+
+function updateSchema(next) {
+    schema(JSON.stringify(next))
+    const root = schema.root
+    if (root.node) return
+    let node = document.head.querySelector('script[type="' + SCHEMA_TYPE + '"]')
+    if (hydration) {
+        if (isPlaceholder(next)) next(JSON.parse(node.text))
+    } else if (!node) {
+        node = document.createElement('script')
+        node.type = SCHEMA_TYPE
+        document.head.appendChild(node)
+    }
+    root.node = node
+    node.text = ''
+    update(root)
+}
+
+/**
+ * Meta
+ */
+export let meta = null
+
+export const useMeta = (next) => {
+    meta ??= createHeadValue([])
+    meta.schedule(next, updateMeta)
+}
+
+function updateMeta(next) {
+    const elements = []
+    for (const props of next) elements.push(new Element('meta', props))
+    meta(elements)
+    const root = meta.root
+    if (root.node) return
+    root.node = document.head
+    for (const props of next) {
+        let attr = ''
+        for (const key in props) {
+            if (key !== 'content') { attr = key; break }
+        }
+        const query = 'meta[' + attr + '="' + props[attr] + '"]'
+        let node = document.head.querySelector(query)
+        if (hydration) {
+            for (const key in props) {
+                const v = props[key]
+                if (isPlaceholder(v)) v(node.getAttribute(key))
+            }
+        }
+        if (node) document.head.removeChild(node)
+    }
+    update(root)
+}

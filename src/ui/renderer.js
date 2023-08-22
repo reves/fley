@@ -46,6 +46,7 @@ export function update(fiber, hydrate = false) {
         while (rootParent || fiberParent) {
             // Fiber is the ancestor of root, or the root itself
             if (rootParent === fiber) {
+                
                 reset()
                 update(fiber)
                 return
@@ -60,7 +61,7 @@ export function update(fiber, hydrate = false) {
             fiberParent = fiberParent?.parent
         }
         // Fiber is on another branch
-        queue.update.push(fiber)
+        queue.update.push([fiber.actual, hydrate])
         return
     }
 
@@ -333,14 +334,14 @@ function commit() {
     }
 
     // Replace the alternate in the tree with its clone
-    if (root.parent) {
+    const parent = root.parent
+    if (parent) {
         const alt = root.alt
-        const altParent = alt.parent
         root.sibling = alt.sibling
-        if (altParent.child === alt) {
-            altParent.child = root
+        if (parent.child === alt) {
+            parent.child = root
         } else {
-            let prev = altParent.child
+            let prev = parent.child
             while (prev.sibling !== alt) prev = prev.sibling
             prev.sibling = root
         }
@@ -360,7 +361,6 @@ function commit() {
 
     // Update DOM
     root.walkDepth((fiber, nodeCursor, setNodeCursor) => {
-        if (fiber.type === null) return
         fiber.update(nodeCursor, setNodeCursor)
         fiber.reset()
     })
@@ -377,11 +377,11 @@ function commit() {
         reset()
         for (let i=updates.length; i--; ) {
             synchronous = 1
-            update(updates[i])
+            const [actual, hydrate] = updates[i]
+            update(actual[0], hydrate) // update "actual"
         }
         return
     }
-
     // Done
     reset()
 }

@@ -1,10 +1,12 @@
-import { Text, Inline } from './Element'
+import Element, { Text, Inline } from './Element'
 import { hydration, queue } from "./renderer"
-import { isFunction } from '../utils'
+import { isFunction, isBool, isValueRef, isPlaceholder } from '../utils'
 
 const nodes = {} // nodes pool
 export const isReserved = prop => prop === 'children' || prop === 'html' || prop === 'memo'
 export const isEventListener = prop => prop[0] === 'o' && prop[1] === 'n'
+export const createRoot = (children, node) =>
+    new Fiber(new Element(null, { children }), node)
 
 /**
  * Virtual DOM node
@@ -20,7 +22,8 @@ export default class Fiber {
         this.sibling = null
         this.child = null
         this.isSvg = parent?.isSvg || this.type === 'svg'
-        this.sync = elementOrFiber.sync || parent?.sync
+        this.sync = false
+        this.actual = [this] // ref to the latest cloned version
 
         // Reconciliation
         this.alt = null
@@ -34,14 +37,15 @@ export default class Fiber {
             this.isComponent = true
             this.states = []
             this.effects = []
-            this.actual = [this] // ref to the latest cloned version
+        } else {
+            this.dynamicProps = {}
         }
     }
 
-    clone(parent, element, insert = false, toReplace) {
+    clone(parent = this.parent, element, insert = false, toReplace) {
         // Memoization check
         let memoize = false
-        if (parent) {
+        if (arguments.length) {
             const prevProps = this.props
             const nextProps = element.props
             switch (this.type) {
@@ -60,7 +64,9 @@ export default class Fiber {
         }
 
         // Create a clone
-        const fiber = new Fiber(element ?? this, this.node, parent ?? this.parent, toReplace)
+        const fiber = new Fiber(element ?? this, this.node, parent, toReplace)
+        fiber.sync = this.sync || parent?.sync
+        fiber.actual = this.actual
 
         // Reconciliation
         fiber.alt = this
@@ -72,7 +78,6 @@ export default class Fiber {
             fiber.isComponent = true
             fiber.states = this.states
             fiber.effects = this.effects
-            fiber.actual = this.actual
         }
 
         return fiber
@@ -115,7 +120,13 @@ export default class Fiber {
      * Applies changes to the DOM and schedules side effects.
      */
     update(nodeCursor, setNodeCursor) {
+        this.actual[0] = this // update version
         const memoized = this.memo
+
+        if (this.type == null) {
+            this.updateNode()
+            return
+        }
 
         // Update relations
         if (memoized) {
@@ -126,31 +137,57 @@ export default class Fiber {
             }
         }
 
+        // Update Component
         if (this.isComponent) {
             if (memoized) {
                 const onEach = this.insert && (f => f.insertNode(nodeCursor))
                 setNodeCursor(this.getLastNode(onEach))
-            } else {
-                // Schedule effects
-                for (const e of this.effects) e.fn && (e.sync
-                    ? queue.sync.push(e.fn)
-                    : queue.async.push(e.fn)
-                )
-            }
-            // Update version
-            if (this.isComponent) this.actual[0] = this
+                return
+            } 
+            // Schedule effects
+            for (const e of this.effects) e.fn && (e.sync
+                ? queue.sync.push(e.fn)
+                : queue.async.push(e.fn)
+            )
             return
         }
 
         // Hydrate (bind the DOM node to the Fiber)
         if (hydration) {
+            const parentNode = nodeCursor.parentNode
+            
+            // Placeholder
+            if (nodeCursor.nodeType === 8) {
+                const dataNode = nodeCursor.nextSibling
+
+                // Empty <!----><!---->
+                if (dataNode.nodeType === 8) { 
+                    this.createNode()
+                    parentNode.insertBefore(this.node, dataNode)
+                    parentNode.removeChild(dataNode)
+                    setNodeCursor(this.node)
+                    return
+                }
+
+                // Parse <!---->data<!---->
+                parentNode.removeChild(dataNode.nextSibling)
+                this.parent.type(dataNode.nodeValue)
+                this.node = dataNode
+                setNodeCursor(dataNode)
+                return
+            }
+
             this.node = nodeCursor
             if (this.type === Text) {
                 const len = this.props.value.length
-                if (len < this.node.nodeValue.length) this.node.splitText(len)
-                return
-            }
-            this.updateNode()
+                if (!len) {
+                    this.createNode()
+                    parentNode.insertBefore(this.node, nodeCursor.nextSibling)
+                    setNodeCursor(this.node)
+                } else if (len < nodeCursor.nodeValue.length) {
+                    nodeCursor.splitText(len)
+                }
+            } else this.updateNode()
             return
         }
 
@@ -183,7 +220,7 @@ export default class Fiber {
     updateNode() {
         const node = this.node
         const nextProps = this.props
-        const prevProps = this.alt?.props ?? {}
+        const prevProps = this.type == null ? {} : (this.alt?.props ?? {})
 
         if (this.type === Text) {
             const value = nextProps.value
@@ -211,6 +248,12 @@ export default class Fiber {
             // Skip props that will remain
             if (prop in nextProps) continue
 
+            // Value ref
+            if (isFunction(value) && isValueRef(value)) {
+                value._unwatch(this.actual)
+                delete this.dynamicProps[prop]
+            }
+
             // Remove attribute
             node.removeAttribute(prop)
         }
@@ -232,23 +275,42 @@ export default class Fiber {
                 continue
             }
 
+            // Function or Value (ref)
+            if (isFunction(value)) {
+                if (isValueRef(value)) {
+                    if (!hydration) {
+                        this.updateNodeAttribute(prop, value())
+                    } else if (isPlaceholder(value)) {
+                        value(node.getAttribute(prop))
+                    }
+                    value._watch(this.actual)
+                    this.dynamicProps[prop] = value
+                }
+                continue
+            }
+
             // Skip same values
             if (prop in prevProps && Object.is(value, prevProps[prop])) {
                 continue
             }
-
+            
             if (hydration) continue
 
             // Attribute
-            if (prop === 'value') {
-                node.value = value
-            } else if (typeof value === 'boolean' && value) {
-                node.setAttribute(prop, '')
-            } else if (value != null) {
-                node.setAttribute(prop, value)
-            } else {
-                node.removeAttribute(prop)
-            }
+            this.updateNodeAttribute(prop, value)
+        }
+    }
+
+    updateNodeAttribute(prop, value) {
+        const node = this.node
+        if (prop === 'value') {
+            node.value = value
+        } else if (isBool(value) && value) {
+            node.setAttribute(prop, '')
+        } else if (value != null) {
+            node.setAttribute(prop, value)
+        } else {
+            node.removeAttribute(prop)
         }
     }
 
@@ -282,8 +344,12 @@ export default class Fiber {
                 ? e.cleanup()
                 : queue.async.push(e.cleanup)
             )
-            this.actual[0] = null
-        } else if (this.props.ref) this.props.ref(null)
+        } else {
+            if (this.props.ref) this.props.ref(null)
+            const dyProps = this.dynamicProps
+            for (const prop in dyProps) dyProps[prop]._unwatch(this.actual)
+        }
+        this.actual[0] = null
     }
 
     /**

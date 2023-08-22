@@ -1,5 +1,6 @@
 import { current, update, queue } from './renderer'
-import { isFunction, isObject, isUndefined, defineProperty, getOwnProperties, seal } from '../utils'
+import { isFunction, isObject, isUndefined, defineProperty, getOwnProperties,
+    seal, isString, isValueRef } from '../utils'
 
 // Most recent indexes of states & effects arrays.
 let cursorState = 0, cursorEffect = 0
@@ -29,12 +30,21 @@ export const useCallback = (fn, deps) => useMemo(() => fn, deps)
 /**
  * Ref
  */
-let condition = null // condition to update the Component
+let condition = null // condition for performing the update
 export const withCondition = (cond) => condition = cond
 
 const updateActual = (actual) => {
+    if (isFunction(actual)) return actual()
+
     const fiber = actual[0]
-    if (!condition || condition(fiber.props, fiber.key)) update(fiber)
+    if (condition && !condition(fiber.props, fiber.key)) return
+
+    // Update fiber
+    if (fiber.isComponent || fiber.type == null) return update(fiber)
+
+    // Update only dynamic attributes
+    const props = fiber.dynamicProps
+    for (const prop in props) fiber.updateNodeAttribute(prop, props[prop]())
 }
 
 const watch = (watchers, ref) => {
@@ -48,7 +58,7 @@ const watch = (watchers, ref) => {
     }
 }
 
-const createRef = (value, actions, watchers, watch) => {
+const createRef = (value, actions, watchers, watch, placeholder) => {
     if (isFunction(value)) value = value()
 
     // Ref
@@ -58,15 +68,18 @@ const createRef = (value, actions, watchers, watch) => {
             return value
         }
         if (isUndefined(next)) return value
-        if (isFunction(next)) next = next(value)
-        if (watchers) {
+        if (isFunction(next) && !isValueRef(next)) next = next(value)
+        if (watchers) {ref  
             if (value !== next || isObject(value) && isObject(next)) {
                 value = next
-                const list = Array.isArray(watchers) ? watchers : new Set(watchers)
+                const list = watchers instanceof Set
+                    ? new Set(watchers)
+                    : watchers
                 list.forEach(updateActual)
             }
         } else value = next
     }
+    ref[Symbol.toPrimitive] = _ => ref()
 
     // Actions
     if (actions) {
@@ -89,7 +102,13 @@ const createRef = (value, actions, watchers, watch) => {
         }
     }
 
-    return seal(ref)
+    if (watchers instanceof Set) {
+        ref._watch = actual => watchers.add(actual)
+        ref._unwatch = actual => watchers.delete(actual)
+        if (placeholder) ref._getPlaceholder = _ => placeholder
+    }
+
+    return ref
 }
 
 export const useRef = (initial) => useMemo(() => createRef(initial))
@@ -99,9 +118,16 @@ export const useState = (initial, actions) => {
     return [ref(), ref]
 }
 
-export const createValue = (initial, actions) => {
-    const watchers = new Set()
-    return createRef(initial, actions, watchers, watch)
+export const createValue = (initial, actions, placeholder) => {
+    if (actions && isString(actions)) {
+        placeholder = actions
+        actions = null
+    }
+    const createValueRef = () => {
+        const watchers = new Set()
+        return createRef(initial, actions, watchers, watch, placeholder)
+    }
+    return current ? useMemo(() => createValueRef()) : createValueRef()
 }
 
 export const createStore = (Store, ...args) => {
@@ -161,7 +187,7 @@ function Effect(sync = false) {
     this.deps = null
 }
 
-const _useEffect = (fn, deps, sync) => {
+export const useEffect = (fn, deps, sync) => {
     const effect = current.effects[cursorEffect++] ??= new Effect(sync)
     if (same(effect.deps, deps)) {
         effect.fn = null
@@ -185,5 +211,4 @@ const _useEffect = (fn, deps, sync) => {
     }
 }
 
-export const useEffect = (fn, deps) => _useEffect(fn, deps)
-export const useLayoutEffect = (fn, deps) => _useEffect(fn, deps, true)
+export const useLayoutEffect = (fn, deps) => useEffect(fn, deps, true)

@@ -1,5 +1,5 @@
 import { createStore } from '../ui/hooks'
-import { getCookie, isBrowser } from '../utils'
+import { getCookie, isArray, isBool, isBrowser, isNum, isObject, isString } from '../utils'
 
 class I18n {
 
@@ -77,21 +77,20 @@ function interpolate(template, substitute, tag) {
     if (!template) return ''
     if (substitute == null) return template
 
-    const type = typeof substitute
     let regExp, replacer
 
     switch (true) {
-        case type === 'string':
+        case isString(substitute):
             regExp = new RegExp('\\{' + (tag ?? 's') + '\\}', 'g')
             replacer = substitute
             break
 
-        case type === 'boolean':
+        case isBool(substitute):
             regExp = new RegExp('\\{' + (tag ?? 'b') + '\\:([^\\}]*)\\|\\|([^\\}]*)\\}', 'g')
             replacer = (_, $1, $2) => substitute ? $1.trim() : $2.trim()
             break
 
-        case type === 'number':
+        case isNum(substitute):
             regExp = new RegExp('\\{' + (tag ?? 'n')
                 + '(?:\\:([^\\}]+))?\\}(?:\\s*\\(([^\\)]*\\|[^\\)]*)\\))?|\\(([^\\)]*\\|[^\\)]*)\\)', 'g'
             )
@@ -116,11 +115,11 @@ function interpolate(template, substitute, tag) {
                 ).format(substitute)
             break
 
-        case Array.isArray(substitute):
+        case isArray(substitute):
             substitute.forEach((s, i) => template = interpolate(template, s, i))
             break
 
-        case type === 'object':
+        case isObject(substitute):
             for (const k in substitute) template = interpolate(
                 template,
                 substitute[k],

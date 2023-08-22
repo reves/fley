@@ -1,10 +1,9 @@
-import Fiber from './ui/Fiber'
-import Element from './ui/Element'
+import { createRoot } from './ui/Fiber'
 import { update, current } from './ui/renderer'
 
 export default function ley(children, container = document.body) {
     container.innerHTML = ''
-    update(new Fiber( new Element(null, { children }), container))
+    update(createRoot(children, container))
 }
 
 export const Sync = ({ children }) => (current.sync = true) && children
@@ -20,3 +19,4 @@ export {
     createStore,
     withCondition
 } from './ui/hooks'
+export { useTitle, useMeta, useSchema } from './ui/head'

@@ -226,12 +226,7 @@ const memoizedCallback = useCallback(fn, [deps])
 ```
 
 ### Metadata
-Managing the metadata in the `<head>` section.
-```javascript
-import { useTitle, useMeta, useSchema } from 'ley/head'
-
-// Hooks used in a deeper and farther component overwrite the value.
-```
+Managing the metadata in the `<head>` section. Hooks used in a deeper and farther Component overwrite the value.
 
 #### useTitle
 Sets the document title.
@@ -284,7 +279,8 @@ useSchema({
 ### createValue
 Creates a stored value (reference).
 ```javascript
-const value = createValue(initial, actions)
+const value = createValue(initial, actions, placeholder)
+const value = createValue(initial, placeholder) // shortens createValue(initial, null, placeholder)
 ```
 ```javascript
 import ley, { createValue } from 'ley'
@@ -326,7 +322,14 @@ const count = function() {
 }
 ```
 
-#### `count()` is also a getter
+#### `count` is also a dynamic attribute
+```javascript
+function App() {
+    return <p title={count}>Only the attribute updates on count() change.</p>
+}
+```
+
+#### `count()` is a getter
 The `count()` is a function that returns the stored value and, at the same time, makes the outer Component reactive to the stored value changes.
 ```javascript
 function App() {
@@ -336,7 +339,8 @@ function App() {
     </>
 }
 ```
-#### `count(newValue)` is also a setter
+
+#### `count(newValue)` is a setter
 The `count(newValue)` is a function that changes the stored value.
 ```javascript
 function App() {
@@ -346,6 +350,65 @@ function App() {
         <button onClick={() => count(0)}>Res</button>
     </>
 }
+```
+
+#### `placeholder` parameter
+The `placeholder` is a user-defined `string` (more like a template tag) that's used for Server-to-Client data binding in [Pre-rendering](#pre-rendering-ssr). It tells the server where to insert the data before sending HTML to the client.
+```javascript
+function Article() {
+    const title = createValue('', '%title%')
+    const content = createValue('', /* actions, */ '%content%')
+
+    // Metadata
+    useTitle(title)
+    useMeta([ {name: 'description', content: title} ])
+
+    return <div>
+        <h1 title={title}>{title}</h1>
+        <p>{content}</p>
+    </div>
+}
+```
+Generated static HTML:
+
+Empty `<!---->` comments mark corresponding `value()`'s data that should be parsed.
+```html
+<title>%title%</title>
+...
+<meta name="description" content="%title%">
+...
+<div>
+    <h1 title="%title%"><!---->%title%<!----></h1>
+    <p><!---->%content%<!----></p>
+</div>
+```
+Processed HTML on the server and sent to the client:
+
+```html
+<title>Lorem Ipsum</title>
+...
+<meta name="description" content="Lorem Ipsum">
+...
+<div>
+    <h1 title="Lorem Ipsum"><!---->Lorem Ipsum<!----></h1>
+    <p><!---->Lorem ipsum dolor sit amet, consectetur adipiscing elit.<!----></p>
+</div>
+```
+Resulting HTML after hydration process:
+```html
+<title>Lorem Ipsum</title>
+...
+<meta name="description" content="Lorem Ipsum">
+...
+<div>
+    <h1 title="Lorem Ipsum">Lorem Ipsum</h1>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+</div>
+```
+Parsed values:
+```javascript
+title() === 'Lorem Ipsum'
+content() === 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.'
 ```
 
 ### createStore
@@ -929,8 +992,11 @@ handler.abort()
 
 ## Pre-rendering (SSR)
 ### General idea
-1. Compile at build time a JSON file with static HTML for each defined route.
-2. On the server, match the URL path against each route's RegEx and serve corresponding static HTML.
+1. Compile at build time a JSON file with static HTML's for each defined route.
+2. On the server:
+    1. match the requested URL path against each route's RegEx and get corresponding static HTML.
+    2. replace [placeholders](#placeholder-parameter) with data
+    3. send response to the client.
 3. Hydrate on the client side.
 
 <!--A template engine can be used on the server side to include the data. This can be achieved by first setting the initial state values to template variables in the application:
@@ -978,7 +1044,8 @@ Example of the resulting `routes` object:
             title: 'Home page',
             meta: '<meta name="description" content="App home page.">',
             schema: '<script type="application/ld+json">{"@context":"https://schema.org/"}</script>',
-            content: '<h1>Welcome to the Home page.</h1>'
+            content: '<h1>Welcome to the Home page.</h1><p>%content%</p><b>%author%</b>',
+            placeholders: ['%content%', '%author%']
         }
     },
     about: {

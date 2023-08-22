@@ -1,4 +1,4 @@
-import { isFunction, isObject } from "../utils"
+import { isArray, isBool, isFunction, isObject } from "../utils"
 
 /**
  * JSX Element types
@@ -10,12 +10,14 @@ export const Inline = 2
 /**
  * JSX Element
  */
-export default function Element(type, props, key) {
+export default function Element(type, props = {}, key) {
     if ('children' in props) props.children = normalize(props.children)
     this.type = type
     this.props = props
     this.key = key
 }
+
+export const createTextElement = (value = '') => new Element(Text, { value })
 
 /**
  * Returns an Array of normalized children.
@@ -23,21 +25,22 @@ export default function Element(type, props, key) {
 export function normalize(children = [], result = [], keys = {}) {
 
     // Convert to array if not
-    if (!Array.isArray(children)) children = [children]
+    if (!isArray(children)) children = [children]
 
     // Process children
     for (let i=0, n=children.length; i<n; i++) {
 
         const child = children[i]
 
-        // Remove empty strings and unnecessary data types
-        if (child === '' || child == null || child === false || child === true) {
+        // Convert unnecessary data types to empty slots
+        if (child == null || isBool(child)) {
+            result.push(createTextElement())
             continue
         }
 
-        // Execute functions
+        // Convert function to Component
         if (isFunction(child)) {
-            result.push(new Element(child, {}))
+            result.push(new Element(child))
             continue
         }
 
@@ -48,12 +51,12 @@ export function normalize(children = [], result = [], keys = {}) {
                 prev.props.value += child
                 continue
             }
-            result.push(new Element(Text, { value: '' + child }))
+            result.push(createTextElement('' + child))
             continue
         }
 
         // Flatten array
-        if (Array.isArray(child)) {
+        if (isArray(child)) {
             normalize(child, result, keys)
             continue
         }
@@ -63,7 +66,7 @@ export function normalize(children = [], result = [], keys = {}) {
             const html = (child.props.html + '').trim()
             if (!html) continue
             if (html[0] !== '<') {
-                result.push(new Element(Text, { value: html.split('<', 1)[0] }))
+                result.push(createTextElement(html.split('<', 1)[0]))
                 continue
             }
             child.props.html = html
