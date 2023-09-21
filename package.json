@@ -1,22 +1,22 @@
 {
-    "name": "@reves/ley",
-    "version": "1.5.0",
+    "name": "fley",
+    "version": "1.0.0",
     "description": "Concurrent frontend JavaScript framework",
     "keywords": [
         "i18n", "hooks", "virtual-dom", "router", "reconciliation", "jsx", "ssr", "concurrency", "api-client", "hydration", "frontend-framework", "fiber", "react-like", "global-state"
     ],
     "sideEffects": false,
-    "browser": "./src/ley.js",
+    "browser": "./src/fley.js",
     "exports": {
-        ".": "./src/ley.js",
+        ".": "./src/fley.js",
         "./*": [
             "./src/*.js",
             "./src/stores/*.js"
         ],
         "./hydrate": "./src/static/hydrate.js"
     },
-    "homepage": "https://github.com/reves/ley",
-    "bugs": "https://github.com/reves/ley/issues",
+    "homepage": "https://github.com/reves/fley",
+    "bugs": "https://github.com/reves/fley/issues",
     "license": "MIT",
-    "repository": "github:reves/ley"
+    "repository": "github:reves/fley"
 }

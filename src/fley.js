@@ -1,7 +1,7 @@
 import { createRoot } from './ui/Fiber'
 import { update, current } from './ui/renderer'
 
-export default function ley(children, container = document.body) {
+export default function fley(children, container = document.body) {
     container.innerHTML = ''
     update(createRoot(children, container))
 }

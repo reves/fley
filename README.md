@@ -1,4 +1,4 @@
-# ley
+# fley
 
 Frontend JavaScript web framework based on [JSX syntax](https://github.com/facebook/jsx) and concurrent renderer with [Fiber Architecture](https://github.com/acdlite/react-fiber-architecture).
 
@@ -13,7 +13,7 @@ Frontend JavaScript web framework based on [JSX syntax](https://github.com/faceb
 
 ## Installation
 ```console
-npm i ley@npm:@reves/ley
+npm i fley
 ```
 ```console
 npm i -D @babel/core @babel/plugin-transform-react-jsx
@@ -29,7 +29,7 @@ npm i -D @babel/core @babel/plugin-transform-react-jsx
         options: {
             plugins: [[
                 '@babel/plugin-transform-react-jsx',
-                { runtime: 'automatic', importSource: 'ley' }
+                { runtime: 'automatic', importSource: 'fley' }
             ]]
         }
     }
@@ -38,10 +38,10 @@ npm i -D @babel/core @babel/plugin-transform-react-jsx
 ## Usage
 
 ```javascript
-ley('Hello, World!') // By default, uses document.body as the root element.
+fley('Hello, World!') // By default, uses document.body as the root element.
 ```
 ```javascript
-import ley, { useState } from 'ley'
+import fley, { useState } from 'fley'
 
 function App() {
     const [count, setCount] = useState(0)
@@ -51,17 +51,17 @@ function App() {
     </>
 }
 
-ley(<App />, document.getElementById("app"))
+fley(<App />, document.getElementById("app"))
 ```
 #### Inline HTML
 
 ```javascript
-import ley, { Inline } from 'ley'
+import fley, { Inline } from 'fley'
 import iconUser from './icon-user.svg' // e.g. using Webpack
 
 // The resulting DOM node is reused if the 'html' string
 // remains the same.
-ley(<>
+fley(<>
     <Inline html={iconUser} width="16px"/>
     <Inline html="<ul> <li>One</li> <li>Two</li> </ul>" style="color: green;"/>
     <Inline html="Must start with an outer element. <p>This is omitted</p>"/>
@@ -113,7 +113,7 @@ function List() {
     </>
 }
 
-ley(<List/>)
+fley(<List/>)
 
 // Without "memo":
 // (1) List update
@@ -126,10 +126,10 @@ ley(<List/>)
 #### Synchronous rendering
 The `Sync` component disables concurrency when rendering its subtree. This way it allows everything it wraps to be rendered synchronously.
 ```javascript
-import ley, { Sync } from 'ley'
+import fley, { Sync } from 'fley'
 import App from './App'
 
-ley(<Sync><App /></Sync>)
+fley(<Sync><App /></Sync>)
 ```
 
 ## Hooks
@@ -283,7 +283,7 @@ const value = createValue(initial, actions, placeholder)
 const value = createValue(initial, placeholder) // shortens createValue(initial, null, placeholder)
 ```
 ```javascript
-import ley, { createValue } from 'ley'
+import fley, { createValue } from 'fley'
 
 const actionsDescriptor = {
     inc: c => ++c,
@@ -300,7 +300,7 @@ function App() {
     </>
 }
 
-ley(<App />)
+fley(<App />)
 ```
 
 #### `count` is a Component
@@ -421,8 +421,8 @@ const store = createStore(StoreClass, ...constructorArgs)
 By accessing any property of the store inside a Component, that Component automatically becomes reactive to the actions.
 
 ```javascript
-import ley, { createStore } from 'ley'
-import api from 'ley/api'
+import fley, { createStore } from 'fley'
+import api from 'fley/api'
 
 class Theme {
     static styles = ['light', 'dark']
@@ -456,7 +456,7 @@ function App() {
     </>
 }
 
-ley(<App/>)
+fley(<App/>)
 ```
 
 #### Asynchronous actions
@@ -488,7 +488,7 @@ withCondition((props, key) => /* ... */)
 This is a special hook that can be used inside actions. It sets a condition that will be applied to each (subscribed) Component to determine if it should re-render.
 
 ```javascript
-import ley, { createStore, createValue, withCondition } from 'ley'
+import fley, { createStore, createValue, withCondition } from 'fley'
 
 // or createStore...
 const selector = createValue(null, {
@@ -504,7 +504,7 @@ function Row({ id }) {
     </div>
 }
 
-ley(<>
+fley(<>
     <Row id={1} />
     <Row id={2} />
     <Row id={3} />
@@ -522,8 +522,8 @@ ley(<>
 - [router.go()](#routergo)
 
 ```javascript
-import ley from 'ley'
-import router from 'ley/router'
+import fley from 'fley'
+import router from 'fley/router'
 
 router.define({
 	home: /^\/$/i,
@@ -543,7 +543,7 @@ function App() {
     </>
 }
 
-ley(<App/>)
+fley(<App/>)
 ```
 #### router.define()
 Defines named routes using regular expressions, especially [named groups](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Groups_and_Ranges#using_named_groups) for dynamic params.
@@ -570,8 +570,8 @@ router.go('/about', () => window.scrollTo(0, 0))
 - [Configuration](#configuration)
 - [Formatting](#formatting)
 ```javascript
-import ley from 'ley'
-import i18n, { t } from 'ley/i18n'
+import fley from 'fley'
+import i18n, { t } from 'fley/i18n'
 
 const en = { message: { hello: 'Hello!' } }
 const ro = { message: { hello: 'Bună!' } }
@@ -589,7 +589,7 @@ function App() {
     </>
 }
 
-ley(<App/>)
+fley(<App/>)
 ```
 #### i18n.define()
 Defines language codes and corresponding locale objects. The first defined will be the fallback locale.
@@ -619,7 +619,7 @@ i18n.setLocale('en')
 
 ### Locales list
 ```javascript
-import i18n, { getLocales } from 'ley/i18n'
+import i18n, { getLocales } from 'fley/i18n'
 
 i18n.define({
     'en-US': { $: { name: "English" } },
@@ -798,7 +798,7 @@ t('message', { a: 'a pencil', b: 10, c: { x: { y: 49.99 } } })
 
 
 ```javascript
-import api from 'ley/api'
+import api from 'fley/api'
 
 api.init({ baseURL: 'https://api.example.com'})
 
@@ -873,7 +873,7 @@ api.request(method, endpoint, body)
 
 ### Instance
 ```javascript
-import { Api } from 'ley/api'
+import { Api } from 'fley/api'
 
 const api = new Api({
     responseType: 'document'
@@ -1005,10 +1005,10 @@ const [title, setTitle] = useState('{{article.title}}')
 ```-->
 
 ### Guide
-#### 1. Replace `ley()` with `hydrate()` in `index.jsx`
+#### 1. Replace `fley()` with `hydrate()` in `index.jsx`
 ```javascript
-import hydrate, { isBrowser } from 'ley/hydrate'
-import router from 'ley/router'
+import hydrate, { isBrowser } from 'fley/hydrate'
+import router from 'fley/router'
 import App from './App/App'
 
 router.define({
