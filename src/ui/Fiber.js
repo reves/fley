@@ -159,6 +159,7 @@ export default class Fiber {
             // Placeholder
             if (nodeCursor.nodeType === 8) {
                 const dataNode = nodeCursor.nextSibling
+                parentNode.removeChild(nodeCursor)
 
                 // Empty <!----><!---->
                 if (dataNode.nodeType === 8) { 
@@ -171,12 +172,12 @@ export default class Fiber {
 
                 // Parse <!---->data<!---->
                 parentNode.removeChild(dataNode.nextSibling)
-                this.parent.type(dataNode.nodeValue)
-                this.node = dataNode
-                setNodeCursor(dataNode)
+                this.parent.type(dataNode.nodeValue) // upd Value
+                setNodeCursor(this.node = dataNode)
                 return
             }
 
+            // Regular node
             this.node = nodeCursor
             if (this.type === Text) {
                 const len = this.props.value.length

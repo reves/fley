@@ -1,4 +1,6 @@
-# fley
+<p align="center"><img src="https://github.com/reves/fley/assets/8700863/befe3bd5-371c-4451-84a7-3b75441a8b1b" alt="fley" width="156"/></p>
+
+<h1 align="center">fley</h1>
 
 Frontend JavaScript web framework based on [JSX syntax](https://github.com/facebook/jsx) and concurrent renderer with [Fiber Architecture](https://github.com/acdlite/react-fiber-architecture).
 
