@@ -28,19 +28,39 @@ class I18n {
         if (this.setLocale(getCookie('lang'))) return
 
         // Detect locale from the browser
-        if (this.setLocale(navigator.language)) return
+        const codes = navigator.languages || [ navigator.language ]
+        for (const code of codes) {
+            if (this.setLocale(code)) return
+        }
 
         // Use the fallback locale
         this.setLocale(fallbackCode)
     }
 
     setLocale(code) {
-        if (this.code === code) return null
-        if (!(code in I18n.locales)) return null
+        if (!isString(code) || code.length < 2 || this.code === code) return
+
+        // Match locale
+        let found = code in I18n.locales
+        if (!found) {
+            code = code.slice(0, 2)
+            for (const key in I18n.locales) {
+                if (key.indexOf(code) === 0) {
+                    found = true
+                    code = key
+                    break
+                }
+            }
+            if (!found) return
+        }
+
+        // Set cookie
         if (isBrowser) {
             document.cookie = 'lang=' + code + ';path=/;max-age=31536000;secure;samesite=Lax'
             document.documentElement.setAttribute('lang', code)
         }
+
+        // Set current locale
         this.code = code
         this.locale = I18n.locales[code]
         this.plural = this.locale.$?.plural ?? (n => n == 1 ? 0 : 1)
