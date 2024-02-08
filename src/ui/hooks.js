@@ -49,22 +49,26 @@ const updateActual = (actual) => {
 
 const watch = (watchers, ref) => {
     const actual = current.actual
-    const isSelf = (ref && ref === actual[0].type)
-    if (isSelf || !watchers.has(actual)) {
+    if (ref && ref === actual[0].type) { // ref as Component, watches itself
         useLayoutEffect(() => {
             watchers.add(actual)
             return () => watchers.delete(actual)
-        }, isSelf ? [] : null)
+        }, [])
+    } else {
+        useStatelessEffect(
+            () => watchers.add(actual),
+            () => watchers.delete(actual)
+        )
     }
 }
 
-const createRef = (value, actions, watchers, watch, placeholder) => {
+const createRef = (value, actions, watchers, watchable, placeholder) => {
     if (isFunction(value)) value = value()
 
     // Ref
     const ref = (next) => {
         if (current) {
-            watch && watch(watchers, ref)
+            watchable && watch(watchers, ref)
             return value
         }
         if (isUndefined(next)) return value
@@ -125,7 +129,7 @@ export const createValue = (initial, actions, placeholder) => {
     }
     const createValueRef = () => {
         const watchers = new Set()
-        return createRef(initial, actions, watchers, watch, placeholder)
+        return createRef(initial, actions, watchers, true, placeholder)
     }
     return current ? useMemo(() => createValueRef()) : createValueRef()
 }
@@ -192,7 +196,7 @@ export const useEffect = (fn, deps, sync) => {
     if (same(effect.deps, deps)) {
         effect.fn = null
         return
-    } 
+    }
     const cleanup = effect.cleanup
     if (sync) {
         cleanup && queue.sync.push(cleanup)
@@ -201,14 +205,21 @@ export const useEffect = (fn, deps, sync) => {
             effect.deps = deps
             effect.fn = null // free retained memory
         }
-        return
-    }
-    effect.fn = () => {
-        cleanup && cleanup()
-        effect.cleanup = fn()
-        effect.deps = deps
-        effect.fn = null
+    } else {
+        effect.fn = () => {
+            cleanup && cleanup()
+            effect.cleanup = fn()
+            effect.deps = deps
+            effect.fn = null
+        }
     }
 }
 
 export const useLayoutEffect = (fn, deps) => useEffect(fn, deps, true)
+
+const useStatelessEffect = (fn, cleanup) => {
+    const effect = new Effect(true)
+    effect.fn = fn
+    effect.cleanup = cleanup
+    current.statelessEffects.push(effect)
+}

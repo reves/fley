@@ -37,6 +37,7 @@ export default class Fiber {
             this.isComponent = true
             this.states = []
             this.effects = []
+            this.statelessEffects = []
         } else {
             this.dynamicProps = {}
         }
@@ -149,6 +150,12 @@ export default class Fiber {
                 ? queue.sync.push(e.fn)
                 : queue.async.push(e.fn)
             )
+            // Schedule statelsess effects
+            if (this.alt) {
+                for (const e of this.alt.statelessEffects)
+                    e.cleanup && queue.sync.push(e.cleanup)
+            }
+            for (const e of this.statelessEffects) queue.sync.push(e.fn)
             return
         }
 
@@ -221,7 +228,7 @@ export default class Fiber {
     updateNode() {
         const node = this.node
         const nextProps = this.props
-        const prevProps = this.type == null ? {} : (this.alt?.props ?? {})
+        const prevProps = (this.type == null) ? {} : (this.alt?.props ?? {})
 
         if (this.type === Text) {
             const value = nextProps.value
@@ -345,6 +352,7 @@ export default class Fiber {
                 ? e.cleanup()
                 : queue.async.push(e.cleanup)
             )
+            for (const e of this.statelessEffects) e.cleanup && e.cleanup()
         } else {
             if (this.props.ref) this.props.ref(null)
             const dyProps = this.dynamicProps

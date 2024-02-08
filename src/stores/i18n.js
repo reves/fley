@@ -41,17 +41,16 @@ class I18n {
         if (!isString(code) || code.length < 2 || this.code === code) return
 
         // Match locale
-        let found = code in I18n.locales
-        if (!found) {
-            code = code.slice(0, 2)
+        if (!(code in I18n.locales)) {
+            let match = ''
+            code = code.toLowerCase()
             for (const key in I18n.locales) {
-                if (key.indexOf(code) === 0) {
-                    found = true
-                    code = key
-                    break
-                }
+                const _key = key.toLowerCase()
+                if (code === _key) { match = key; break }
+                if (key.length > match.length && _key.indexOf(code) === 0) match = key
             }
-            if (!found) return
+            if (!match) return
+            code = match
         }
 
         // Set cookie
