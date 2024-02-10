@@ -22,7 +22,7 @@ export default class Fiber {
         this.sibling = null
         this.child = null
         this.isSvg = parent?.isSvg || this.type === 'svg'
-        this.sync = false
+        this.sync = parent?.sync || false
         this.actual = [this] // ref to the latest cloned version
 
         // Reconciliation
@@ -66,7 +66,7 @@ export default class Fiber {
 
         // Create a clone
         const fiber = new Fiber(element ?? this, this.node, parent, toReplace)
-        fiber.sync = this.sync || parent?.sync
+        fiber.sync = this.sync
         fiber.actual = this.actual
 
         // Reconciliation
