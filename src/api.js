@@ -32,7 +32,7 @@ export class Api {
 
     post(endpoint, data = {}) {
         const form = new FormData()
-        for (const key in data) data.append(key, data[key])
+        for (const key in data) form.append(key, data[key])
         return this.request('POST', endpoint, form)
     }
 
