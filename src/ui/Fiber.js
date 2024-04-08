@@ -315,7 +315,7 @@ export default class Fiber {
             node.value = value
         } else if (isBool(value) && value) {
             node.setAttribute(prop, '')
-        } else if (value != null) {
+        } else if (value != null && !isBool(value)) {
             node.setAttribute(prop, value)
         } else {
             node.removeAttribute(prop)
