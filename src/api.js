@@ -32,7 +32,13 @@ export class Api {
 
     post(endpoint, data = {}) {
         const form = new FormData()
-        for (const key in data) form.append(key, data[key])
+        for (const key in data) {
+            if (data[key] instanceof FileList) {
+                for (const file of data[key]) form.append(key + '[]', file)
+                continue
+            }
+            form.append(key, data[key])
+        }
         return this.request('POST', endpoint, form)
     }
 
