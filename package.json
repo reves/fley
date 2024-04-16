@@ -1,6 +1,6 @@
 {
     "name": "fley",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "description": "Concurrent frontend JavaScript framework",
     "keywords": [
         "i18n", "hooks", "virtual-dom", "router", "reconciliation", "jsx", "ssr", "concurrency", "api-client", "hydration", "frontend-framework", "fiber", "react-like", "global-state"
