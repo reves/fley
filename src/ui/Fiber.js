@@ -298,7 +298,7 @@ export default class Fiber {
             }
 
             // Skip same values
-            if (prop in prevProps && Object.is(value, prevProps[prop])) {
+            if (prop !== 'value' && prop in prevProps && Object.is(value, prevProps[prop])) {
                 continue
             }
             
