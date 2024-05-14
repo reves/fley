@@ -3,6 +3,9 @@ import { normalize, Text, Inline } from './Element'
 import { resetCursors } from './hooks'
 import { isBrowser } from '../utils'
 
+// Is commit stage.
+let isCommit = false
+
 // Current level of a synchronous subtree. Defaults to 0, but initialized with 
 // a surplus so that the root is considered a "synchronous subtree". Thus, the 
 // first render is synchronous.
@@ -39,25 +42,27 @@ export function update(fiber, hydrate = false) {
 
     // Another rendering process is already running
     if (root) {
-        const rootAlt = root.alt
-        let rootParent = rootAlt
-        let fiberParent = fiber.parent
+        if (!isCommit) {
+            const rootAlt = root.alt
+            let rootParent = rootAlt
+            let fiberParent = fiber.parent
 
-        while (rootParent || fiberParent) {
-            // Fiber is the ancestor of root, or the root itself
-            if (rootParent === fiber) {
-                reset(true)
-                update(fiber)
-                return
+            while (rootParent || fiberParent) {
+                // Fiber is the ancestor of root, or the root itself
+                if (rootParent === fiber) {
+                    reset(true)
+                    update(fiber)
+                    return
+                }
+                // Fiber is a descendant of root
+                if (fiberParent === rootAlt) {
+                    reset(true)
+                    update(rootAlt)
+                    return
+                }
+                rootParent = rootParent?.parent
+                fiberParent = fiberParent?.parent
             }
-            // Fiber is a descendant of root
-            if (fiberParent === rootAlt) {
-                reset(true)
-                update(rootAlt)
-                return
-            }
-            rootParent = rootParent?.parent
-            fiberParent = fiberParent?.parent
         }
         // Fiber is on another branch
         queue.update.push([fiber.actual, hydrate])
@@ -78,6 +83,7 @@ export function update(fiber, hydrate = false) {
  */ 
 function reset(saveUpdateQueue = false) {
     // Renderer
+    isCommit = false
     synchronous = 0
     hydration = false
     root = null
@@ -323,14 +329,7 @@ function getElementByKey(elements, elementsLen, startIndex, key) {
  */
 function commit() {
     if (!isBrowser) return [root, reset]
-
-    // Force sync execution of remaining async effects from previous commit
-    const async = queue.async
-    if (async.length) { 
-        clearTimeout(queue.timeoutId)
-        for (const effect of async) effect()
-        async.length = 0
-    }
+    isCommit = true
 
     // Replace the alternate in the tree with its clone
     const parent = root.parent
@@ -368,13 +367,13 @@ function commit() {
     for (const effect of sync) effect()
 
     // Schedule async effects
-    scheduleNextEffect()
+    if (queue.timeoutId == null) scheduleNextEffect()
 
     // Process the update queue
     if (queue.update.length) {
         const updates = queue.update.slice()
         reset()
-        for (let i=updates.length; i--; ) {
+        for (let i=0; i<updates.length; i++) {
             synchronous = 1
             const [actual, hydrate] = updates[i]
             update(actual[0], hydrate) // update "actual"
