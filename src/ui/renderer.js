@@ -46,14 +46,13 @@ export function update(fiber, hydrate = false) {
         while (rootParent || fiberParent) {
             // Fiber is the ancestor of root, or the root itself
             if (rootParent === fiber) {
-                
-                reset()
+                reset(true)
                 update(fiber)
                 return
             }
             // Fiber is a descendant of root
             if (fiberParent === rootAlt) {
-                reset()
+                reset(true)
                 update(rootAlt)
                 return
             }
@@ -77,7 +76,7 @@ export function update(fiber, hydrate = false) {
 /**
  * Cancels the rendering process and resets the data.
  */ 
-function reset() {
+function reset(saveUpdateQueue = false) {
     // Renderer
     synchronous = 0
     hydration = false
@@ -91,7 +90,7 @@ function reset() {
     // Queue
     for (const fn of queue.reset) fn()
     queue.deletions.length = 0
-    queue.update.length = 0
+    if (!saveUpdateQueue) queue.update.length = 0
     queue.reset.length = 0
     queue.sync.length = 0
 }
