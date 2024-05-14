@@ -73,7 +73,7 @@ const createRef = (value, actions, watchers, watchable, placeholder) => {
         }
         if (isUndefined(next)) return value
         if (isFunction(next) && !isValueRef(next)) next = next(value)
-        if (watchers) {ref  
+        if (watchers) {
             if (value !== next || isObject(value) && isObject(next)) {
                 value = next
                 const list = watchers instanceof Set
