@@ -86,7 +86,7 @@ function onRelativeLinkClick(e) {
     }
 
     e.preventDefault()
-    router.go(href)
+    router.go(href, () => window.scrollTo(0, 0))
     return false
 }
 
