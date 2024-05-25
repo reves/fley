@@ -1,5 +1,5 @@
 import { createRoot, isReserved } from '../ui/Fiber'
-import { Text } from '../ui/Element'
+import { Text, Inline } from '../ui/Element'
 import { update } from '../ui/renderer'
 import router from '../stores/router'
 import i18n, { getLocales } from '../stores/i18n'
@@ -69,8 +69,8 @@ function rootToString(root) {
                 result += escape(fiber.props.value)
                 return
             }
-            if (fiber.props.hasOwnProperty('html')) {
-                result += fiber.type.replace(/^(<\w+)/, `$1${propsToString(fiber)}`)
+            if (fiber.type === Inline) {
+                result += fiber.props.html.replace(/^(<\w+)/, `$1${propsToString(fiber)}`)
                 return
             }
             if (voidElements.indexOf(fiber.type) !== -1) return
