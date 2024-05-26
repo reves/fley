@@ -1,4 +1,4 @@
-import Element, { Text, Inline, createTextElement } from './Element'
+import Element, { Text, Inline } from './Element'
 import { hydration, queue } from "./renderer"
 import { isFunction, isBool, isValueRef, isPlaceholder } from '../utils'
 
