@@ -1,4 +1,4 @@
-import Element, { Text, Inline } from './Element'
+import Element, { Text, Inline, createTextElement } from './Element'
 import { hydration, queue } from "./renderer"
 import { isFunction, isBool, isValueRef, isPlaceholder } from '../utils'
 
@@ -162,14 +162,14 @@ export default class Fiber {
         // Hydrate (bind the DOM node to the Fiber)
         if (hydration) {
             const parentNode = nodeCursor.parentNode
-            
+
             // Placeholder
             if (nodeCursor.nodeType === 8) {
                 const dataNode = nodeCursor.nextSibling
                 parentNode.removeChild(nodeCursor)
 
                 // Empty <!----><!---->
-                if (dataNode.nodeType === 8) { 
+                if (dataNode.nodeType === 8) {
                     this.createNode()
                     parentNode.insertBefore(this.node, dataNode)
                     parentNode.removeChild(dataNode)
@@ -189,8 +189,9 @@ export default class Fiber {
             if (this.type === Text) {
                 const len = this.props.value.length
                 if (!len) {
+                    // Recover text slot
                     this.createNode()
-                    parentNode.insertBefore(this.node, nodeCursor.nextSibling)
+                    parentNode.insertBefore(this.node, nodeCursor)
                     setNodeCursor(this.node)
                 } else if (len < nodeCursor.nodeValue.length) {
                     nodeCursor.splitText(len)
@@ -370,13 +371,29 @@ export default class Fiber {
 
         // Node cursor
         let nodeCursor = hydration ? this.node : null
-        const setNodeCursor = (node) => node && (nodeCursor = node)
+        const setNodeCursor = (node) => (nodeCursor = node)
         const nodeStack = []
         const beforeChild = hydration
-            ? () => setNodeCursor(nodeCursor.firstChild)
+            ? () => {
+                let firstChild = nodeCursor.firstChild
+                if (!firstChild) {
+                    // Recover text slot in an empty parent
+                    firstChild = document.createTextNode('')
+                    nodeCursor.appendChild(firstChild)
+                }
+                setNodeCursor(firstChild)
+            }
             : () => nodeStack.push(nodeCursor) && (nodeCursor = null)
         const beforeSibling = hydration
-            ? () => setNodeCursor(nodeCursor.nextSibling)
+            ? () => {
+                let nextSibling = nodeCursor.nextSibling
+                if (!nextSibling) {
+                    // Recover text slot for an empty sibling (very last child)
+                    nextSibling = document.createTextNode('')
+                    nodeCursor.parentNode.insertBefore(nextSibling, null)
+                }
+                setNodeCursor(nextSibling)
+            }
             : () => nodeCursor = fiber.node
         const beforeParent = hydration
             ? () => {

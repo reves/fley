@@ -119,7 +119,7 @@ function titleToString(title) {
     return `<title>${title}</title>`
 }
 
-function metaToString(meta) {
+function metaToString(meta = []) {
     let result = ''
     for (const props of meta) {
         result += '<meta'
