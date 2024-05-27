@@ -76,8 +76,12 @@ function rootToString(root) {
             if (voidElements.indexOf(fiber.type) !== -1) return
             result += `</${fiber.type}>`
         }, (fiber) => {
-            if (fiber.isComponent || fiber === root) return
-            if (fiber.type === Text || fiber.props.hasOwnProperty('html')) return
+            if (fiber === root) return
+            if (fiber.isComponent) {
+                if (fiber.type._getPlaceholder) return null
+                return
+            }
+            if (fiber.type === Text || fiber.type === Inline) return
             result += `<${fiber.type}${propsToString(fiber)}>`
         }
     )
