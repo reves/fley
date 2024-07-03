@@ -4,6 +4,7 @@ import { isBrowser } from '../utils'
 class Router {
 
     static initialized = false
+    static goCallback = null
 
     constructor() {
         this.routes = {}
@@ -15,7 +16,7 @@ class Router {
         this.from = ''
     }
 
-    define(routes = {}) {
+    define(routes = {}, settings = {}) {
         if (isBrowser && !Router.initialized) {
             try { window.history.replaceState({}, '', window.location.href) } catch(error) {}
             window.addEventListener('popstate', _ => router.go(window.location.pathname))
@@ -23,6 +24,7 @@ class Router {
             Router.initialized = true
         }
         this.routes = routes
+        Router.goCallback = settings.goCallback
         isBrowser && this.go(window.location.pathname)
     }
 
@@ -54,6 +56,7 @@ class Router {
                     return params
                 }, {})
             : {}
+        cb = cb || Router.goCallback
         cb && cb()
     }
 }
@@ -86,7 +89,7 @@ function onRelativeLinkClick(e) {
     }
 
     e.preventDefault()
-    router.go(href, () => window.scrollTo(0, 0))
+    router.go(href)
     return false
 }
 

@@ -547,19 +547,26 @@ function App() {
 
 fley(<App/>)
 ```
-#### router.define()
+#### router.define(routes, options)
 Defines named routes using regular expressions, especially [named groups](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Groups_and_Ranges#using_named_groups) for dynamic params.
 ```javascript
 router.define({
 	home: /^\/$/i,
 	user: /^\/user\/(?<username>.*)$/i, // router.params.username
 })
+
+router.define({}, {
+    // Callback that will be called on navigation
+    // (popstate or relative link click)
+    // Default: null
+    goCallback: () => window.app.scrollTo(0, 0) 
+})
 ```
-#### router.go()
+#### router.go(path, goCallback)
 Navigates programmatically.
 ```javascript
 router.go('/about')
-router.go('/about', () => window.scrollTo(0, 0))
+router.go('/about', () => window.scrollTo(0, 0)) // custom goCallback
 ```
 
 ## I18n
