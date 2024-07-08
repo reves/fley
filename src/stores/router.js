@@ -30,17 +30,17 @@ class Router {
 
     go(path, cb) {
         path = path[0] === '/' ? path : ('/' + path)
-        if (path !== window.location.pathname){
+        if (path !== window.location.pathname) {
             window.history.pushState({}, '', path)
         }
-        this.path = path
+        this.path = window.location.pathname
         this.hash = window.location.hash
         this.from = this.name
         this.name = ''
         this.params = {}
         for (const name in this.routes) {
-            const result = path.match(this.routes[name])
-            if (result && result.shift() === path) {
+            const result = this.path.match(this.routes[name])
+            if (result && result.shift() === this.path) {
                 this.name = name
                 this.params = result.groups || {}
                 break
