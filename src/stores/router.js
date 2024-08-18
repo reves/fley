@@ -1,6 +1,9 @@
 import { createStore } from '../ui/hooks'
 import { isBrowser } from '../utils'
 
+const location = isBrowser ? window.location : {}
+const getURI = _ => location.pathname + location.search + location.hash
+
 class Router {
 
     static initialized = false
@@ -18,23 +21,21 @@ class Router {
 
     define(routes = {}, settings = {}) {
         if (isBrowser && !Router.initialized) {
-            try { window.history.replaceState({}, '', window.location.href) } catch(error) {}
-            window.addEventListener('popstate', _ => router.go(window.location.pathname))
+            try { window.history.replaceState({}, '', location.href) } catch(error) {}
+            window.addEventListener('popstate', _ => router.go(getURI()))
             document.addEventListener('click', onRelativeLinkClick)
             Router.initialized = true
         }
         this.routes = routes
         Router.goCallback = settings.goCallback
-        isBrowser && this.go(window.location.pathname)
+        isBrowser && this.go(getURI())
     }
 
     go(path, cb) {
-        path = path[0] === '/' ? path : ('/' + path)
-        if (path !== window.location.pathname) {
-            window.history.pushState({}, '', path)
-        }
-        this.path = window.location.pathname
-        this.hash = window.location.hash
+        /* if (path[0] !== '#')  */path = path[0] === '/' ? path : ('/' + path)
+        if (path !== getURI()) window.history.pushState({}, '', path)
+        this.path = location.pathname
+        this.hash = location.hash
         this.from = this.name
         this.name = ''
         this.params = {}
@@ -46,8 +47,8 @@ class Router {
                 break
             }
         }
-        this.query = window.location.search
-            ? window.location.search.slice(1).split('&')
+        this.query = location.search
+            ? location.search.slice(1).split('&')
                 .reduce((params, param) => {
                     const [key, value] = param.split('=')
                     params[key] = value
