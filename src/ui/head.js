@@ -43,7 +43,7 @@ function updateTitle(next) {
         if (isPlaceholder(next)) next(defaultTitle)
         defaultTitle = ''
     }
-    document.title = '' // ensures title node exists
+    document.title = defaultTitle // ensures title node exists
     root.node = document.head.querySelector('title')
     update(root)
 }

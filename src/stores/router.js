@@ -32,7 +32,7 @@ class Router {
     }
 
     go(path, cb) {
-        /* if (path[0] !== '#')  */path = path[0] === '/' ? path : ('/' + path)
+        path = path[0] === '/' ? path : ('/' + path)
         if (path !== getURI()) window.history.pushState({}, '', path)
         this.path = location.pathname
         this.hash = location.hash
