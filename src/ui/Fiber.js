@@ -155,7 +155,7 @@ export default class Fiber {
                 for (const e of this.alt.statelessEffects)
                     e.cleanup && queue.sync.push(e.cleanup)
             }
-            for (const e of this.statelessEffects) queue.sync.push(e.fn)
+            for (const e of this.statelessEffects) queue.syncR.push(e.fn)
             return
         }
 

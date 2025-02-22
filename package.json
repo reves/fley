@@ -1,6 +1,6 @@
 {
     "name": "fley",
-    "version": "1.0.20",
+    "version": "1.0.21",
     "description": "Concurrent frontend JavaScript framework",
     "keywords": [
         "i18n", "hooks", "virtual-dom", "router", "reconciliation", "jsx", "ssr", "concurrency", "api-client", "hydration", "frontend-framework", "fiber", "react-like", "global-state"
@@ -9,10 +9,9 @@
     "browser": "./src/fley.js",
     "exports": {
         ".": "./src/fley.js",
-        "./*": [
-            "./src/*.js",
-            "./src/stores/*.js"
-        ],
+        "./*": "./src/*.js",
+        "./router": "./src/stores/router.js",
+        "./i18n": "./src/stores/i18n.js",
         "./hydrate": "./src/static/hydrate.js"
     },
     "homepage": "https://github.com/reves/fley",

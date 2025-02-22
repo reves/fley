@@ -30,6 +30,7 @@ export const queue = {
     update:     [], // fibers to be updated
     reset:      [], // functions to be called in reset()
     sync:       [], // effects to be performed sync. during commit
+    syncR:       [], // effects to be performed sync-reversed. during commit
     async:      [], // effects to be performed async. after commit
     timeoutId:  null
 }
@@ -65,6 +66,9 @@ export function update(fiber, hydrate = false) {
             }
         }
         // Fiber is on another branch
+        for (const entry of queue.update) {
+            if (entry[0] === fiber.actual) return // skip if already queued
+        }
         queue.update.push([fiber.actual, hydrate])
         return
     }
@@ -99,6 +103,7 @@ function reset(saveUpdateQueue = false) {
     if (!saveUpdateQueue) queue.update.length = 0
     queue.reset.length = 0
     queue.sync.length = 0
+    queue.syncR.length = 0
 }
 
 /**
@@ -365,6 +370,10 @@ function commit() {
 
     // Produce sync effects queued in the "Update DOM" step
     for (const effect of sync) effect()
+
+    // Produce sync-reversed effects queued in the "Update DOM" step
+    const syncR = queue.syncR
+    for (let i=syncR.length; i--;) syncR[i]()
 
     // Schedule async effects
     if (queue.timeoutId == null) scheduleNextEffect()

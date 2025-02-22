@@ -49,17 +49,29 @@ const updateActual = (actual) => {
 
 const watch = (watchers, ref) => {
     const actual = current.actual
-    if (ref && ref === actual[0].type) { // ref as Component, watches itself
-        useLayoutEffect(() => {
+
+    // ref as Component, watches itself.
+    if (ref && ref === actual[0].type)
+        return useLayoutEffect(() => {
             watchers.add(actual)
             return () => watchers.delete(actual)
         }, [])
-    } else {
-        useStatelessEffect(
-            () => watchers.add(actual),
-            () => watchers.delete(actual)
-        )
-    }
+
+    // Watch a Store for updates.
+    useStatelessEffect(
+        () => {
+            // Skip if already watching, or an ancestor is in the list.
+            let ancestor = actual[0] // start with self
+            while (ancestor) {
+                for (const watcherActual of watchers) {
+                    if (ancestor.actual === watcherActual) return
+                }
+                ancestor = ancestor.parent
+            }
+            watchers.add(actual)
+        },
+        () => watchers.delete(actual)
+    )
 }
 
 const createRef = (value, actions, watchers, watchable, placeholder) => {
