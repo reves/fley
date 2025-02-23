@@ -189,6 +189,8 @@ export default class Fiber {
             if (this.type === Text) {
                 const len = this.props.value.length
                 if (!len) {
+                    // Text slot in an empty parent (recovered in walkDepth()).
+                    if (!this.sibling && this.parent.child === this) return
                     // Recover text slot
                     this.createNode()
                     parentNode.insertBefore(this.node, nodeCursor)
